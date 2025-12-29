@@ -6,7 +6,7 @@ const About = () => {
     return (
         <div className="min-h-screen">
             {/* Hero */}
-            <section className="relative overflow-hidden pt-24 lg:pt-36 pb-24">
+            <section id="about" className="relative overflow-hidden pt-24 lg:pt-36 pb-24">
                 {/* Removed radial gradient */}
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center relative z-10">
                     <h1 className="text-4xl md:text-6xl font-bold text-white mb-6 leading-tight">Pioneering the Future of <br />Enterprise AI</h1>
@@ -69,7 +69,7 @@ const About = () => {
             </section>
 
             {/* Team */}
-            <section className="py-24 bg-white/5 border-y border-white/5 backdrop-blur-sm">
+            <section id="team" className="py-24 bg-white/5 border-y border-white/5 backdrop-blur-sm">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                     <div className="text-center mb-16">
                         <h2 className="text-3xl font-bold text-white mb-4">Leadership Team</h2>

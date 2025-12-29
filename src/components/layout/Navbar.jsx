@@ -39,26 +39,26 @@ const Navbar = () => {
   const navLinks = [
     { name: 'Home', path: '/' },
     { name: 'Products', path: '/products' },
-    { name: 'About', path: '/#about' },
-    { name: 'Team', path: '/#team' },
+    { name: 'About', path: '/about#about' },
+    { name: 'Team', path: '/about#team' },
     { name: 'Contact', path: '/contact' },
   ];
 
   const handleNavClick = (e, path) => {
-    if (path.startsWith('/#')) {
-      e.preventDefault();
-      const id = path.substring(2);
-      const element = document.getElementById(id);
+    if (path.includes('#')) {
+      const [pathname, hash] = path.split('#');
+      const id = hash;
 
-      if (location.pathname !== '/') {
-        // If not on home page, navigate to home then scroll
-        window.location.href = path;
-      } else {
-        // If on home page, just scroll
+      // If already on the correct page, just scroll
+      if (location.pathname === pathname) {
+        e.preventDefault();
+        const element = document.getElementById(id);
         if (element) {
           element.scrollIntoView({ behavior: 'smooth' });
         }
       }
+      // If on different page, let the Link handle navigation
+      // and the useEffect will handle scrolling
       setIsOpen(false);
     } else {
       setIsOpen(false);
@@ -82,17 +82,21 @@ const Navbar = () => {
 
           {/* Desktop Navigation */}
           <div className="hidden md:flex items-center space-x-8">
-            {navLinks.map((link) => (
-              <Link
-                key={link.name}
-                to={link.path}
-                onClick={(e) => handleNavClick(e, link.path)}
-                className={`text-sm font-medium transition-colors duration-300 hover:text-violet-400 ${location.pathname === link.path || (link.path.startsWith('/#') && location.hash === link.path.substring(1)) ? 'text-violet-400' : 'text-neutral-300'
-                  }`}
-              >
-                {link.name}
-              </Link>
-            ))}
+            {navLinks.map((link) => {
+              const [pathname, hash] = link.path.split('#');
+              const isActive = location.pathname === pathname || (hash && location.pathname === pathname && location.hash === `#${hash}`);
+              return (
+                <Link
+                  key={link.name}
+                  to={link.path}
+                  onClick={(e) => handleNavClick(e, link.path)}
+                  className={`text-sm font-medium transition-colors duration-300 hover:text-violet-400 ${isActive ? 'text-violet-400' : 'text-neutral-300'
+                    }`}
+                >
+                  {link.name}
+                </Link>
+              );
+            })}
             <Link
               to="/contact"
               className="px-6 py-2.5 rounded-full bg-white text-black font-semibold hover:bg-violet-50 transition-colors duration-300 text-sm"
@@ -123,17 +127,21 @@ const Navbar = () => {
             className="md:hidden bg-black/95 backdrop-blur-xl border-b border-white/10 overflow-hidden"
           >
             <div className="px-4 pt-2 pb-8 space-y-4">
-              {navLinks.map((link) => (
-                <Link
-                  key={link.name}
-                  to={link.path}
-                  onClick={(e) => handleNavClick(e, link.path)}
-                  className={`block text-lg font-medium ${location.pathname === link.path || (link.path.startsWith('/#') && location.hash === link.path.substring(1)) ? 'text-violet-400' : 'text-neutral-300'
-                    }`}
-                >
-                  {link.name}
-                </Link>
-              ))}
+              {navLinks.map((link) => {
+                const [pathname, hash] = link.path.split('#');
+                const isActive = location.pathname === pathname || (hash && location.pathname === pathname && location.hash === `#${hash}`);
+                return (
+                  <Link
+                    key={link.name}
+                    to={link.path}
+                    onClick={(e) => handleNavClick(e, link.path)}
+                    className={`block text-lg font-medium ${isActive ? 'text-violet-400' : 'text-neutral-300'
+                      }`}
+                  >
+                    {link.name}
+                  </Link>
+                );
+              })}
               <Link
                 to="/contact"
                 className="block w-full text-center px-6 py-3 rounded-xl bg-violet-600 text-white font-semibold hover:bg-violet-700 transition-colors"
