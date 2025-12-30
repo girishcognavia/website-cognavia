@@ -9,7 +9,7 @@
     "lint": "eslint . --ext js,jsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview",
     "deploy": "gh-pages -d dist",
-    "predeploy": "npm run build"
+    "predeploy": "npm run build && echo 'cognavia.ai' > dist/CNAME"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.0.1",
