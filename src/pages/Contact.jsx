@@ -48,7 +48,7 @@ const Contact = () => {
                                     <div>
                                         <h3 className="text-lg font-semibold text-white">Visit Us</h3>
                                         <p className="text-neutral-400">Kristal Jasper, Villa No.3J123</p>
-                                        <p className="text-neutral-500 text-sm mt-1">Come say hello at our office.</p>
+                                       
                                     </div>
                                 </div>
                             </div>
