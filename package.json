@@ -5,11 +5,11 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host",
-    "build": "vite build",
+    "build": "vite build && echo 'cognavia.ai' > dist/CNAME && touch dist/.nojekyll",
     "lint": "eslint . --ext js,jsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview",
     "deploy": "gh-pages -d dist",
-    "predeploy": "npm run build && echo 'cognavia.ai' > dist/CNAME"
+    "predeploy": "npm run build"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.0.1",
