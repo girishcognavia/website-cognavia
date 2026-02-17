@@ -1,7 +1,41 @@
 import React from 'react';
-import { Mail, Phone, MapPin, Send } from 'lucide-react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { toast } from 'sonner';
+import { Mail, Phone, MapPin, Send, Loader2 } from 'lucide-react';
+import { contactFormSchema } from '@/lib/contact-schema';
+import { submitContactForm } from '@/lib/contact-api';
 
 const Contact = () => {
+    const {
+        register,
+        handleSubmit,
+        reset,
+        formState: { errors, isSubmitting },
+    } = useForm({
+        resolver: zodResolver(contactFormSchema),
+        defaultValues: {
+            name: '',
+            email: '',
+            productInterest: '',
+            message: '',
+        },
+    });
+
+    const onSubmit = async (data) => {
+        try {
+            await submitContactForm(data);
+            toast.success('Message sent!', {
+                description: "Thank you for reaching out. We'll get back to you within 24 hours.",
+            });
+            reset();
+        } catch (error) {
+            toast.error('Failed to send message', {
+                description: error.message || 'Something went wrong. Please try again.',
+            });
+        }
+    };
+
     return (
         <div className="min-h-screen">
             <section className="relative overflow-hidden pt-24 lg:pt-36 pb-20">
@@ -48,7 +82,7 @@ const Contact = () => {
                                     <div>
                                         <h3 className="text-lg font-semibold text-white">Visit Us</h3>
                                         <p className="text-neutral-400">Kristal Jasper, Villa No.3J123</p>
-                                       
+
                                     </div>
                                 </div>
                             </div>
@@ -57,49 +91,73 @@ const Contact = () => {
                         {/* Form */}
                         <div className="bg-white/5 rounded-3xl p-8 border border-white/10 backdrop-blur-sm">
                             <h2 className="text-2xl font-bold text-white mb-6">Send us a Message</h2>
-                            <form className="space-y-6">
+                            <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
                                 <div className="grid md:grid-cols-2 gap-6">
                                     <div>
                                         <label className="block text-sm font-medium text-neutral-300 mb-2">Name</label>
                                         <input
                                             type="text"
+                                            {...register('name')}
                                             className="w-full px-4 py-3 rounded-xl bg-black/50 border border-white/10 text-white focus:ring-2 focus:ring-violet-500 focus:border-transparent outline-none transition-all placeholder-neutral-600"
                                             placeholder="Your name"
+                                            disabled={isSubmitting}
                                         />
+                                        {errors.name && (
+                                            <p className="text-red-400 text-sm mt-1">{errors.name.message}</p>
+                                        )}
                                     </div>
                                     <div>
                                         <label className="block text-sm font-medium text-neutral-300 mb-2">Email</label>
                                         <input
                                             type="email"
+                                            {...register('email')}
                                             className="w-full px-4 py-3 rounded-xl bg-black/50 border border-white/10 text-white focus:ring-2 focus:ring-violet-500 focus:border-transparent outline-none transition-all placeholder-neutral-600"
                                             placeholder="you@company.com"
+                                            disabled={isSubmitting}
                                         />
+                                        {errors.email && (
+                                            <p className="text-red-400 text-sm mt-1">{errors.email.message}</p>
+                                        )}
                                     </div>
                                 </div>
                                 <div>
                                     <label className="block text-sm font-medium text-neutral-300 mb-2">Product Interest</label>
-                                    <select className="w-full px-4 py-3 rounded-xl bg-black/50 border border-white/10 text-white focus:ring-2 focus:ring-violet-500 focus:border-transparent outline-none transition-all">
+                                    <select
+                                        {...register('productInterest')}
+                                        className="w-full px-4 py-3 rounded-xl bg-black/50 border border-white/10 text-white focus:ring-2 focus:ring-violet-500 focus:border-transparent outline-none transition-all"
+                                        disabled={isSubmitting}
+                                    >
                                         <option value="" className="bg-black">Select a product...</option>
-                                        <option value="cogna-assist" className="bg-black">CognaAssist</option>
-                                        <option value="cogna-brief" className="bg-black">CognaBrief</option>
-                                        <option value="cogna-filesearch" className="bg-black">CognaFileSearch</option>
-                                        <option value="medibook-ai" className="bg-black">MediBook AI</option>
-                                        <option value="other" className="bg-black">Other / General Inquiry</option>
+                                        <option value="CognaAssist" className="bg-black">CognaAssist</option>
+                                        <option value="CognaBrief" className="bg-black">CognaBrief</option>
+                                        <option value="CognaFileSearch" className="bg-black">CognaFileSearch</option>
+                                        <option value="MediBook AI" className="bg-black">MediBook AI</option>
+                                        <option value="Other / General Inquiry" className="bg-black">Other / General Inquiry</option>
                                     </select>
                                 </div>
                                 <div>
                                     <label className="block text-sm font-medium text-neutral-300 mb-2">Message</label>
                                     <textarea
                                         rows="4"
+                                        {...register('message')}
                                         className="w-full px-4 py-3 rounded-xl bg-black/50 border border-white/10 text-white focus:ring-2 focus:ring-violet-500 focus:border-transparent outline-none transition-all placeholder-neutral-600"
                                         placeholder="How can we help you?"
+                                        disabled={isSubmitting}
                                     ></textarea>
+                                    {errors.message && (
+                                        <p className="text-red-400 text-sm mt-1">{errors.message.message}</p>
+                                    )}
                                 </div>
                                 <button
                                     type="submit"
-                                    className="w-full bg-white text-black px-6 py-4 rounded-xl font-bold hover:bg-neutral-200 transition-all flex items-center justify-center gap-2"
+                                    disabled={isSubmitting}
+                                    className="w-full bg-white text-black px-6 py-4 rounded-xl font-bold hover:bg-neutral-200 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
-                                    Send Message <Send className="h-4 w-4" />
+                                    {isSubmitting ? (
+                                        <>Sending... <Loader2 className="h-4 w-4 animate-spin" /></>
+                                    ) : (
+                                        <>Send Message <Send className="h-4 w-4" /></>
+                                    )}
                                 </button>
                             </form>
                         </div>
