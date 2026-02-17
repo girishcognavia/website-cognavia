@@ -172,16 +172,6 @@ const Home = () => {
                             <p className="text-lg text-neutral-400 mb-8 leading-relaxed">
                                 Our mission is to empower organizations of all sizes to harness the transformative power of artificial intelligence, driving growth, efficiency, and innovation across industries.
                             </p>
-                            <div className="grid grid-cols-2 gap-6">
-                                <div className="text-center p-6 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-sm">
-                                    <div className="text-3xl font-bold text-violet-400 mb-2">50+</div>
-                                    <div className="text-neutral-400 text-sm">Projects Completed</div>
-                                </div>
-                                <div className="text-center p-6 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-sm">
-                                    <div className="text-3xl font-bold text-violet-400 mb-2">100+</div>
-                                    <div className="text-neutral-400 text-sm">Professionals Trained</div>
-                                </div>
-                            </div>
                         </motion.div>
                         <motion.div
                             initial={{ opacity: 0, x: 30 }}
