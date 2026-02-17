@@ -137,9 +137,9 @@ const Home = () => {
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
                         {[
-                            { label: 'Documents Processed', value: '50,000+', icon: CheckCircle },
+                            { label: 'AI Models Integrated', value: '10+', icon: CheckCircle },
                             { label: 'AI Accuracy', value: '90%+', icon: Zap },
-                            { label: 'Deployment Time', value: '2 Weeks', icon: Shield },
+                            { label: 'Deployment Time', value: '1 Day', icon: Shield },
                             { label: 'Support', value: '24/7 AI', icon: Users },
                         ].map((stat, index) => (
                             <div key={index} className="group">
