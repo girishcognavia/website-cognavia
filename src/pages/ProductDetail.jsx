@@ -1,6 +1,6 @@
 import React from 'react';
 import { useParams, Navigate, Link } from 'react-router-dom';
-import { Check, ArrowRight, Shield, Zap, BarChart, MessageSquare, FileText, Search, Stethoscope, Activity, FileCheck, Bot } from 'lucide-react';
+import { Check, ArrowRight, Shield, Zap, BarChart, MessageSquare, FileText, Search, Stethoscope, Activity, FileCheck, Bot, ExternalLink } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { products } from '../data/products';
 
@@ -162,6 +162,16 @@ const ProductDetail = () => {
                                 >
                                     Schedule a Demo
                                 </Link>
+                                {product.liveUrl && (
+                                    <a
+                                        href={product.liveUrl}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="px-8 py-4 bg-violet-600 text-white rounded-full font-bold hover:bg-violet-500 transition-colors flex items-center gap-2"
+                                    >
+                                        Try {product.name} <ExternalLink className="h-4 w-4" />
+                                    </a>
+                                )}
                                 <a
                                     href="#features"
                                     className="px-8 py-4 bg-white/5 text-white border border-white/10 rounded-full font-bold hover:bg-white/10 transition-colors backdrop-blur-sm"

@@ -23,6 +23,7 @@ export const products = [
         ],
         pricing: 'Starter plan available',
         path: '/products/cogna-assist',
+        liveUrl: 'https://chat.cognavia.ai/',
         details: {
             heroTitle: 'AI-Powered Customer Support Chatbot for Your Website',
             heroSubtitle: 'CognaAssist is an intelligent, self-learning chatbot platform that transforms your website into a 24/7 customer support powerhouse.',
