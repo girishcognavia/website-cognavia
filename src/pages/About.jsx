@@ -75,7 +75,7 @@ const About = () => {
                         <h2 className="text-3xl font-bold text-white mb-4">Leadership Team</h2>
                         <p className="text-lg text-neutral-400">The minds behind Cognavia.ai</p>
                     </div>
-                    <div className="grid md:grid-cols-3 gap-8">
+                    <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
                         {team.map((member, index) => (
                             <div key={index} className="bg-white/5 p-8 rounded-3xl border border-white/10 text-center hover:bg-white/10 transition-colors duration-300 backdrop-blur-sm">
                                 <div className="w-24 h-24 mx-auto mb-6 rounded-full bg-gradient-to-br from-violet-600 to-indigo-600 flex items-center justify-center text-white text-2xl font-bold shadow-lg shadow-violet-900/20">

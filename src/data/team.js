@@ -1,12 +1,5 @@
 export const team = [
     {
-        name: 'Girish Kumar',
-        role: 'Advisor',
-        initials: 'GK',
-        color: 'indigo',
-        bio: 'Technology leader with 20+ years driving AI & ML transformations and SaaS innovation.'
-    },
-    {
         name: 'Prasad Nair',
         role: 'Chief Technology Officer',
         initials: 'PN',

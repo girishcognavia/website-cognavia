@@ -193,7 +193,7 @@ const Home = () => {
                         <h2 className="text-3xl font-bold text-white mb-4">Leadership Team</h2>
                         <p className="text-lg text-neutral-400">The minds behind Cognavia.ai</p>
                     </div>
-                    <div className="grid md:grid-cols-3 gap-8">
+                    <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
                         {team.map((member, index) => (
                             <motion.div
                                 key={index}
