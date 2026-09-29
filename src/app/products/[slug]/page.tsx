@@ -3,7 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { PRODUCTS, findProduct, productHref } from "@/components/products/productsData";
 import { Breadcrumbs, ContactCta, JsonLd, PageShell, Sections } from "@/components/page/PageBits";
-import { SITE } from "@/lib/site";
+import { OG_IMAGE, SITE } from "@/lib/site";
 
 type Params = { params: Promise<{ slug: string }> };
 
@@ -21,7 +21,7 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
     title,
     description: p.description,
     alternates: { canonical: productHref(p) },
-    openGraph: { title, description: p.description, url: productHref(p) },
+    openGraph: { title, description: p.description, url: productHref(p), images: [OG_IMAGE] },
   };
 }
 

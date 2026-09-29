@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { PRODUCTS, productHref } from "@/components/products/productsData";
 import { Breadcrumbs, ContactCta, PageShell } from "@/components/page/PageBits";
+import { OG_IMAGE } from "@/lib/site";
 
 const DESCRIPTION = "Powerful AI products designed for specific enterprise needs.";
 
@@ -9,7 +10,7 @@ export const metadata: Metadata = {
   title: "Products — Our Intelligent Suite | Cognavia.ai",
   description: `${DESCRIPTION} ${PRODUCTS.map((p) => p.name).join(", ")}.`,
   alternates: { canonical: "/products" },
-  openGraph: { title: "Our Intelligent Suite — Cognavia.ai", description: DESCRIPTION, url: "/products" },
+  openGraph: { title: "Our Intelligent Suite — Cognavia.ai", description: DESCRIPTION, url: "/products", images: [OG_IMAGE] },
 };
 
 export default function ProductsPage() {

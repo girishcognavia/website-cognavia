@@ -2,6 +2,9 @@ import type { MetadataRoute } from "next";
 import { SITE } from "@/lib/site";
 import { PRODUCTS, productHref } from "@/components/products/productsData";
 
+// generated once at build time (static site)
+export const dynamic = "force-static";
+
 // Every view of the app.
 export default function sitemap(): MetadataRoute.Sitemap {
   const now = new Date();

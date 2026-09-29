@@ -21,5 +21,8 @@ export const SITE = {
   ],
 };
 
+/** Social preview image (a view's own openGraph replaces the site-wide one, so each view adds it). */
+export const OG_IMAGE = { url: "/og.png", width: 1200, height: 630, alt: SITE.title };
+
 /** True once a footer/contact value has been filled in (placeholders are in [brackets]). */
 export const isFilled = (v?: string) => !!v && !/^\[.*\]$/.test(v.trim());

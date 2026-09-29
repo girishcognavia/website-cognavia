@@ -5,8 +5,8 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start",
-    "lint": "next lint"
+    "start": "npx serve out",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@fontsource/montserrat": "^5.3.0",

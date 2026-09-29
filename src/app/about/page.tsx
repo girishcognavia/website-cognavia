@@ -6,7 +6,7 @@ import AboutFx from "@/components/about-page/AboutFx";
 import KeyText from "@/components/about-page/KeyText";
 import HowWeWork from "@/components/about-page/HowWeWork";
 import { FutureSite, ToolsToSystem } from "@/components/about-page/visuals";
-import { SITE } from "@/lib/site";
+import { OG_IMAGE, SITE } from "@/lib/site";
 
 const DESCRIPTION = ABOUT.whatWeDo.lead!;
 
@@ -14,7 +14,7 @@ export const metadata: Metadata = {
   title: "About us — Cognavia.ai",
   description: DESCRIPTION,
   alternates: { canonical: "/about" },
-  openGraph: { title: "About us — Cognavia.ai", description: DESCRIPTION, url: "/about" },
+  openGraph: { title: "About us — Cognavia.ai", description: DESCRIPTION, url: "/about", images: [OG_IMAGE] },
 };
 
 export default function AboutPage() {
