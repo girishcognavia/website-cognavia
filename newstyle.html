@@ -1,0 +1,620 @@
+<title>CognaAssist Starfield</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,300;12..96,400&family=Newsreader:ital,opsz,wght@0,6..72,400;1,6..72,400&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    color-scheme: dark;
+    --ink: #04060b;
+    --glow: #15324d;
+    --text: #eaf0f8;
+    --body: #b8c3d5;
+    --muted: #7f8ca3;
+    --line: rgba(170, 195, 230, 0.16);
+    --ice: #6fe3d2;
+    --amber: #ffb26b;
+    --display: "Bricolage Grotesque", ui-sans-serif, system-ui, sans-serif;
+    --serif: "Newsreader", Georgia, "Times New Roman", serif;
+    --mono: "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
+  }
+  html { background: var(--ink); }
+  body {
+    background: var(--ink);
+    color: var(--text);
+    font-family: var(--serif);
+    font-size: 19px;
+    line-height: 1.6;
+    overflow-x: hidden;
+  }
+
+  /* Layers: glow (0) → star canvas (1) → page (2) → top bar (5) */
+  .glow {
+    position: fixed; inset: 0; z-index: 0; pointer-events: none;
+    background: radial-gradient(ellipse farthest-corner at 50% 45%,
+      transparent 0%,
+      color-mix(in srgb, var(--glow) 10%, transparent) 30%,
+      color-mix(in srgb, var(--glow) 45%, transparent) 65%,
+      var(--glow) 100%);
+    opacity: 0;
+    animation: glow-in 5s ease-out 0.3s forwards;
+  }
+  @keyframes glow-in { to { opacity: 0.65; } }
+  #sky { position: fixed; inset: 0; width: 100%; height: 100%; z-index: 1; pointer-events: none; display: block; }
+
+  .top {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 5;
+    display: flex; justify-content: space-between; align-items: center; gap: 16px;
+    padding: calc(env(safe-area-inset-top, 0px) + 16px) 20px 16px;
+    background: linear-gradient(to bottom, rgba(4, 6, 11, 0.85), rgba(4, 6, 11, 0));
+    pointer-events: none;
+  }
+  .wordmark { font-family: var(--display); font-weight: 400; font-size: 17px; letter-spacing: 0.01em; }
+  .tag { font-family: var(--mono); font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); }
+
+  /* Hero */
+  .hero { position: relative; z-index: 2; height: 100svh; min-height: 520px; }
+  .drag {
+    position: absolute; inset: 0; z-index: 1;
+    background: none; border: 0; padding: 0; margin: 0; color: inherit;
+    cursor: grab; touch-action: pan-y pinch-zoom;
+  }
+  .drag[data-dragging="true"] { cursor: grabbing; }
+  .drag:focus-visible { outline: 2px solid rgba(255, 255, 255, 0.6); outline-offset: -8px; border-radius: 12px; }
+  .lbl {
+    position: absolute; top: 50%; transform: translateY(-50%); z-index: 2; margin: 0;
+    font-family: var(--display); font-weight: 300; font-size: clamp(30px, 5vw, 66px);
+    letter-spacing: -0.01em; line-height: 1;
+    text-shadow: 0 2px 8px rgba(0, 0, 0, 0.65), 0 0 22px rgba(0, 0, 0, 0.45);
+    opacity: var(--copy, 1); pointer-events: none; user-select: none;
+  }
+  .lbl.l { left: clamp(16px, 4vw, 56px); }
+  .lbl.r { right: clamp(16px, 4vw, 56px); }
+  .lbl span { display: inline-block; opacity: 0; transform: translateX(var(--shift)); }
+  .hero.play .lbl span { animation: letter 1s cubic-bezier(.22, 1, .36, 1) var(--d) forwards; }
+  @keyframes letter { to { opacity: 1; transform: none; } }
+  .cue {
+    position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); z-index: 2;
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.22em; text-transform: uppercase;
+    color: var(--muted); opacity: var(--copy, 1); pointer-events: none; white-space: nowrap;
+  }
+  .replay {
+    position: absolute; right: 16px; bottom: 16px; z-index: 3;
+    width: 38px; height: 38px; border-radius: 50%; border: 0;
+    background: rgba(255, 255, 255, 0.12); color: rgba(255, 255, 255, 0.85);
+    display: grid; place-items: center; cursor: pointer; opacity: var(--copy, 1);
+    transition: background-color .15s;
+  }
+  .replay:hover { background: rgba(255, 255, 255, 0.22); }
+  .replay:focus-visible { outline: 2px solid rgba(255, 255, 255, 0.7); outline-offset: 2px; }
+
+  /* Article */
+  main { position: relative; z-index: 2; padding-inline: 20px; padding-block: 12vh 0; }
+  .col { max-width: 620px; margin-inline: auto; }
+  .eyebrow { font-family: var(--mono); font-size: 12px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--ice); margin: 0 0 18px; }
+  h1 {
+    font-family: var(--display); font-weight: 300; font-size: clamp(44px, 8vw, 84px);
+    line-height: 1; letter-spacing: -0.03em; margin: 0 0 22px; text-wrap: balance;
+  }
+  .dek { font-style: italic; font-size: clamp(21px, 2.6vw, 25px); line-height: 1.4; color: var(--text); margin: 0 0 1.4em; text-wrap: balance; }
+  h2 {
+    font-family: var(--display); font-weight: 400; font-size: clamp(27px, 3.8vw, 38px);
+    line-height: 1.12; letter-spacing: -0.018em; margin: 0 0 18px; text-wrap: balance;
+  }
+  p { color: var(--body); margin: 0 0 1.1em; text-shadow: 0 1px 14px rgba(4, 6, 11, 0.95); }
+  section.copy { padding-block: 6vh 10vh; }
+
+  .stage {
+    position: relative; height: 80svh; max-height: 760px; min-height: 420px;
+    max-width: 580px; margin-inline: auto;
+  }
+  .stage svg {
+    position: absolute; inset: 6% 6% 12%; width: 88%; height: 82%;
+    opacity: 0; fill: none; stroke: #8ea2c0; stroke-width: 1.2; vector-effect: non-scaling-stroke;
+    pointer-events: none;
+  }
+  .no-gl .stage svg { opacity: 0.45; }
+  .stage figcaption {
+    position: absolute; left: 0; right: 0; bottom: 0; z-index: 2; text-align: center;
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase;
+    color: var(--muted); pointer-events: none;
+  }
+  .stage figcaption b { color: var(--text); font-weight: 400; }
+
+  .how { padding-block: 8vh 6vh; }
+  .how ol { list-style: none; padding: 0; margin: 28px 0 32px; display: grid; gap: 22px; }
+  .how li { display: grid; grid-template-columns: 44px 1fr; gap: 4px 12px; }
+  .how li .n { font-family: var(--mono); font-size: 12px; color: var(--amber); padding-top: 6px; font-variant-numeric: tabular-nums; }
+  .how li h3 { font-family: var(--display); font-weight: 400; font-size: 20px; margin: 0 0 4px; letter-spacing: -0.005em; }
+  .how li p { margin: 0; font-size: 17px; }
+  .code {
+    overflow-x: auto; margin: 0 0 1.2em; padding: 16px 18px;
+    background: rgba(12, 18, 30, 0.72); border: 1px solid var(--line); border-radius: 8px;
+    font-family: var(--mono); font-size: 13px; line-height: 1.65; color: #cfe3ff;
+    backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+  }
+  .code .c { color: var(--muted); }
+  code { font-family: var(--mono); font-size: 0.82em; color: #cfe3ff; }
+  footer {
+    position: relative; z-index: 2; padding: 10vh 20px 48px;
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted);
+  }
+  footer .col { border-top: 1px solid var(--line); padding-top: 18px; display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px 24px; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .glow { animation: none; opacity: 0.65; }
+    .lbl span, .hero.play .lbl span { animation: none; opacity: 1; transform: none; }
+  }
+</style>
+
+<div class="glow" aria-hidden="true"></div>
+<canvas id="sky" aria-hidden="true"></canvas>
+
+<header class="top">
+  <span class="wordmark">Cognavia</span>
+  <span class="tag">CognaAssist · Sample page</span>
+</header>
+
+<section class="hero play" id="hero">
+  <button class="drag" type="button" aria-label="Drag or use arrow keys to rotate the star field"></button>
+  <p class="lbl l" aria-hidden="true" data-side="-1">Cogna</p>
+  <p class="lbl r" aria-hidden="true" data-side="1">Assist</p>
+  <span class="cue">Scroll</span>
+  <button class="replay" id="replay" type="button" aria-label="Replay the opening animation">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg>
+  </button>
+</section>
+
+<main>
+  <section class="col copy">
+    <p class="eyebrow">CognaAssist · Website chatbot</p>
+    <h1>CognaAssist</h1>
+    <p class="dek">Every question a visitor brings to your website, answered in the moment they ask it.</p>
+    <p>Most visitors leave a website without ever filling in a form. CognaAssist sits on your pages, answers from your own content, and turns a passing question into a conversation your team can follow up.</p>
+    <p>Keep scrolling. Each idea below gathers the stars into a shape. Drag a shape to turn it.</p>
+  </section>
+
+  <figure class="stage" data-shape="0">
+    <svg viewBox="0 0 200 180" aria-hidden="true"><path d="M40 20 L160 20 C176 20 186 30 186 46 L186 106 C186 122 176 132 160 132 L92 132 L52 164 L58 132 L40 132 C24 132 14 122 14 106 L14 46 C14 30 24 20 40 20 Z"/><path d="M62 76 L64 76"/><path d="M99 76 L101 76"/><path d="M136 76 L138 76"/></svg>
+    <button class="drag" type="button" aria-label="Drag or use arrow keys to rotate the chat bubble"></button>
+    <figcaption><b>Conversation</b> · answers from your own content</figcaption>
+  </figure>
+
+  <section class="col copy">
+    <h2>It answers like your best front-desk person</h2>
+    <p>CognaAssist is trained on your website, brochures and FAQs, so it answers questions about your products, pricing and processes in your own words. When a question needs a person, it says so and hands over cleanly.</p>
+    <p>It keeps to what your business has published. Visitors get a straight answer or a route to your team, never a guess.</p>
+  </section>
+
+  <figure class="stage" data-shape="1">
+    <svg viewBox="0 0 220 170" aria-hidden="true"><path d="M20 14 L200 14 L200 156 L20 156 Z"/><path d="M20 40 L200 40"/><path d="M34 27 L36 27"/><path d="M46 27 L48 27"/><path d="M58 27 L60 27"/><path d="M130 88 L186 88 L186 128 L152 128 L140 140 L142 128 L130 128 Z"/></svg>
+    <button class="drag" type="button" aria-label="Drag or use arrow keys to rotate the website window"></button>
+    <figcaption><b>Your website</b> · one script tag to install</figcaption>
+  </figure>
+
+  <section class="col copy">
+    <h2>It lives on the site you already have</h2>
+    <p>There is nothing to rebuild. CognaAssist is added to your existing website with a single snippet, takes on your colours and tone, and works on phones as well as desktops.</p>
+    <p>Your team decides what it can talk about and what it should hand over, and can change that at any time.</p>
+  </section>
+
+  <figure class="stage" data-shape="2">
+    <svg viewBox="0 0 200 190" aria-hidden="true"><path d="M14 16 L186 16 L120 96 L120 172 L80 152 L80 96 Z"/></svg>
+    <button class="drag" type="button" aria-label="Drag or use arrow keys to rotate the funnel"></button>
+    <figcaption><b>Leads</b> · conversations become follow-ups</figcaption>
+  </figure>
+
+  <section class="col copy">
+    <h2>Conversations become leads</h2>
+    <p>When a visitor is ready to talk, CognaAssist collects their name and requirement and passes it straight to your team, with the whole conversation attached so nobody has to ask the same question twice.</p>
+    <p>Want to see it on your own website? Cognavia can set up a working demo trained on your pages.</p>
+  </section>
+</main>
+
+<footer>
+  <div class="col">
+    <span>Cognavia · CognaAssist</span>
+    <span>Sample page for testing</span>
+  </div>
+</footer>
+
+<script>
+(() => {
+  const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const hero = document.getElementById('hero');
+
+  /* ---------- Hero label letters ---------- */
+  document.querySelectorAll('.lbl').forEach((el, li) => {
+    const side = Number(el.dataset.side);
+    const text = el.textContent;
+    el.textContent = '';
+    [...text].forEach((ch, i) => {
+      const s = document.createElement('span');
+      s.textContent = ch;
+      s.style.setProperty('--shift', `${side * 22}px`);
+      s.style.setProperty('--d', `${1.5 + i * 0.09 + li * 0.05}s`);
+      el.appendChild(s);
+    });
+  });
+
+  /* ---------- WebGL setup ---------- */
+  const canvas = document.getElementById('sky');
+  const gl = canvas.getContext('webgl2', { alpha: true, antialias: false, premultipliedAlpha: true });
+  if (!gl) { document.documentElement.classList.add('no-gl'); return; }
+
+  const VS = `#version 300 es
+  precision highp float;
+  layout(location=0) in vec3 aSpiral;
+  layout(location=1) in vec3 aScatter;
+  layout(location=2) in vec4 aSeed;
+  layout(location=3) in vec3 aColor;
+  layout(location=4) in vec3 aShape0;
+  layout(location=5) in vec3 aShape1;
+  layout(location=6) in vec3 aShape2;
+
+  uniform mat4 uProj;
+  uniform float uTime, uIntro, uDisperse, uAspect, uPR, uGalScale, uHead, uDrift, uTextHalf, uLens, uShapeScale, uMotion;
+  uniform vec2 uField, uRot, uShapeRot, uShapeCenter, uPointer;
+  uniform vec3 uShapeW;
+
+  out vec3 vColor;
+  out float vAlpha;
+
+  mat2 rot(float a) { float c = cos(a), s = sin(a); return mat2(c, s, -s, c); }
+
+  void main() {
+    float t = uTime;
+    float bg = step(aSeed.w, 0.14);        // background stars never join the galaxy or shapes
+    float heroStar = step(0.988, aSeed.w); // a few large, bright stars
+
+    // 1. Galaxy position: slow spin, tilt, drag rotation
+    vec3 g = aSpiral * uGalScale;
+    g.xy = rot(t * 0.035) * g.xy;
+    g.yz = rot(-1.0 + uRot.x) * g.yz;
+    g.xz = rot(uRot.y) * g.xz;
+
+    // 2. Intro: start scattered over the whole screen, orbit into place
+    vec3 field0 = vec3(aScatter.x * uField.x, aScatter.y * uField.y, aScatter.z * 1.2);
+    float st = 0.10 + aSeed.y * 0.18;
+    float l = clamp((uIntro - st) / (0.58 + aSeed.z * 0.1), 0.0, 1.0);
+    float sm = l * l * l * (l * (l * 6.0 - 15.0) + 10.0);
+    float pull = mix(sm, sin(sm * 1.5707963), 0.5);
+    float ang = sin(pull * 3.1415926) * (0.44 + aSeed.y * 0.22);
+    vec3 orbit = vec3(rot(ang) * field0.xy, field0.z);
+    vec3 pos = mix(orbit, g, pull);
+
+    vec3 idle = field0;
+    idle.x += sin(aSeed.y * 6.2831 + t * (0.3 + 0.4 * aSeed.z)) * 0.06;
+    idle.y += (cos(aSeed.z * 6.2831 + t * (0.25 + 0.3 * aSeed.y)) - 1.0) * 0.06;
+    pos = mix(pos, idle, bg);
+
+    // 3. Dispersed sky, kept clear of the text column
+    float side = aScatter.x < 0.0 ? -1.0 : 1.0;
+    float keepCenter = step(0.8, aSeed.z);
+    float outer = side * mix(uTextHalf, uField.x * 0.5, sqrt(fract(aSeed.y * 7.31)));
+    vec3 sky = vec3(mix(outer, aScatter.x * uField.x, keepCenter), 0.0, aScatter.z * 1.2);
+    float yRaw = aScatter.y * uField.y + uDrift * (0.3 + aSeed.z * 0.9) + t * 0.015 * (0.4 + aSeed.z);
+    sky.y = mod(yRaw + uField.y * 0.5, uField.y) - uField.y * 0.5;
+    sky.x += sin(aSeed.y * 6.2831 + t * (0.3 + 0.4 * aSeed.z)) * 0.05;
+    float dk = smoothstep(aSeed.z * 0.35, aSeed.z * 0.35 + 0.65, uDisperse);
+    pos = mix(pos, sky, dk);
+
+    // 4. Shapes sampled from SVG paths
+    float ws = uShapeW.x + uShapeW.y + uShapeW.z;
+    float onShape = 0.0;
+    if (ws > 0.001) {
+      vec3 s = (aShape0 * uShapeW.x + aShape1 * uShapeW.y + aShape2 * uShapeW.z) / ws;
+      s *= uShapeScale;
+      s.yz = rot(uShapeRot.x) * s.yz;
+      s.xz = rot(uShapeRot.y) * s.xz;
+      s.xy += uShapeCenter;
+      float k = smoothstep(aSeed.y * 0.4, aSeed.y * 0.4 + 0.6, min(ws, 1.0)) * (1.0 - bg);
+      pos = mix(pos, s, k);
+      onShape = k;
+    }
+
+    // Light travelling along the spiral arms
+    float illum = 0.0;
+    if (aSeed.x >= 0.0) {
+      float d = fract(uHead - aSeed.x);
+      float near = min(d, 1.0 - d);
+      illum = max(1.0 - smoothstep(0.0, 0.025, near), (1.0 - smoothstep(0.0, 0.14, d)) * 0.55);
+      illum *= (1.0 - uDisperse) * smoothstep(0.7, 1.0, uIntro) * (1.0 - bg);
+    }
+
+    float tw = mix(1.0, 0.72 + 0.28 * sin(t * (0.8 + aSeed.w * 2.6) + aSeed.y * 40.0), uMotion);
+    float bright = (0.55 + illum * 2.4 + onShape * 0.35) * tw * mix(1.0, 1.9, heroStar);
+    float size = (1.3 + aSeed.z * aSeed.z * 3.0) * mix(1.0, 2.4, heroStar) * (1.0 + illum * 0.8 + onShape * 0.2);
+    float alpha = mix(0.35, 1.0, fract(aSeed.w * 13.7));
+    alpha *= mix(1.0, 0.45, keepCenter * dk);
+
+    // Reveal: fade and grow in before the pull starts
+    float rev = smoothstep(aSeed.z * 0.02, 0.14 + aSeed.z * 0.02, uIntro) * mix(0.2, 1.0, smoothstep(0.2, 1.0, uIntro));
+    size *= sqrt(rev);
+    alpha *= smoothstep(0.0, 0.6, rev);
+
+    // Project (camera at z = 8 looking at the origin)
+    vec4 clip = uProj * vec4(pos.x, pos.y, pos.z - 8.0, 1.0);
+    float persp = 8.0 / max(clip.w, 0.1);
+    bright *= mix(0.75, 1.2, smoothstep(-0.9, 0.9, pos.z));
+
+    // Pointer lens: push stars apart and brighten them
+    vec2 ndc = clip.xy / clip.w;
+    vec2 dd = (ndc - uPointer) * vec2(uAspect, 1.0);
+    float dl = length(dd);
+    float L = (1.0 - smoothstep(0.0, 0.32, dl)) * uLens;
+    ndc += (dd / max(dl, 1e-4)) * vec2(1.0 / uAspect, 1.0) * L * 0.03;
+    clip.xy = ndc * clip.w;
+    bright *= 1.0 + L * 1.4;
+    size *= 1.0 + L * 0.7;
+
+    float px = size * persp * uPR;
+    alpha *= clamp(px / (2.0 * uPR), 0.25, 1.0);
+    gl_PointSize = clamp(px, 1.5, 48.0);
+    gl_Position = clip;
+    vColor = aColor * bright;
+    vAlpha = alpha;
+  }`;
+
+  const FS = `#version 300 es
+  precision mediump float;
+  in vec3 vColor;
+  in float vAlpha;
+  out vec4 outColor;
+  void main() {
+    vec2 p = gl_PointCoord * 2.0 - 1.0;
+    float r2 = dot(p, p);
+    if (r2 > 1.0) discard;
+    float a = (exp(-r2 * 5.0) + exp(-r2 * 1.6) * 0.18) * (1.0 - r2) * vAlpha;
+    outColor = vec4(vColor * a, a);
+  }`;
+
+  function shader(type, src) {
+    const s = gl.createShader(type);
+    gl.shaderSource(s, src);
+    gl.compileShader(s);
+    if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s));
+    return s;
+  }
+  const prog = gl.createProgram();
+  try {
+    gl.attachShader(prog, shader(gl.VERTEX_SHADER, VS));
+    gl.attachShader(prog, shader(gl.FRAGMENT_SHADER, FS));
+    gl.linkProgram(prog);
+    if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(prog));
+  } catch (err) {
+    console.error(err);
+    document.documentElement.classList.add('no-gl');
+    return;
+  }
+  gl.useProgram(prog);
+
+  const U = {};
+  ['uProj','uTime','uIntro','uDisperse','uAspect','uPR','uGalScale','uHead','uDrift','uTextHalf','uLens',
+   'uShapeScale','uMotion','uField','uRot','uShapeRot','uShapeCenter','uPointer','uShapeW']
+    .forEach(n => U[n] = gl.getUniformLocation(prog, n));
+
+  /* ---------- Particle data (built once) ---------- */
+  const N = innerWidth < 700 ? 6000 : 11000;
+  let seed = 27;
+  const rnd = () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+  const gauss = () => Math.sqrt(-2 * Math.log(rnd() + 1e-9)) * Math.cos(2 * Math.PI * rnd());
+  const hex = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16) / 255);
+  const palette = ['#6FE3D2', '#8ED8FF', '#FFB26B', '#FF8A5C', '#F4F6FF'].map(hex);
+  const weights = [0.15, 0.17, 0.07, 0.06, 0.55];
+  const warm = [2, 3, 4, 4];
+  const pick = () => { let r = rnd(), i = 0; while (i < weights.length - 1 && (r -= weights[i]) > 0) i++; return i; };
+
+  const spiral = new Float32Array(N * 3), scatter = new Float32Array(N * 3);
+  const seeds = new Float32Array(N * 4), colors = new Float32Array(N * 3);
+  const TURNS = 1.3;
+  for (let i = 0; i < N; i++) {
+    let x, y, z, orbit;
+    if (rnd() < 0.1) {
+      const r = Math.abs(gauss()) * 0.3, a = rnd() * Math.PI * 2;
+      x = Math.cos(a) * r; y = Math.sin(a) * r; z = gauss() * 0.08; orbit = -1;
+    } else {
+      const arm = i % 2, t = Math.pow(rnd(), 0.75);
+      const a = t * TURNS * Math.PI * 2 + arm * Math.PI;
+      const r = 0.25 + t * 2.5;
+      const spread = gauss() * (0.05 + 0.22 * t);
+      x = Math.cos(a) * r - Math.sin(a) * spread;
+      y = Math.sin(a) * r + Math.cos(a) * spread;
+      z = gauss() * 0.06 * (1 + t);
+      orbit = t;
+    }
+    spiral.set([x, y, z], i * 3);
+    scatter.set([rnd() - 0.5, rnd() - 0.5, rnd() - 0.5], i * 3);
+    seeds.set([orbit, rnd(), rnd(), rnd()], i * 4);
+    colors.set(palette[orbit < 0 ? warm[Math.floor(rnd() * warm.length)] : pick()], i * 3);
+  }
+
+  // Sample an SVG's paths evenly along their combined length.
+  function sampleSVG(svg) {
+    const vb = svg.viewBox.baseVal;
+    const m = Math.max(vb.width, vb.height);
+    const paths = [...svg.querySelectorAll('path')].map(p => ({ p, len: p.getTotalLength() })).filter(o => o.len > 0);
+    const total = paths.reduce((a, b) => a + b.len, 0);
+    const S = 2048, out = new Float32Array(S * 3);
+    let pi = 0, acc = 0;
+    for (let i = 0; i < S; i++) {
+      const d = ((i + 0.5) / S) * total;
+      while (pi < paths.length - 1 && d > acc + paths[pi].len) { acc += paths[pi].len; pi++; }
+      const { p, len } = paths[pi];
+      const local = d - acc;
+      const pt = p.getPointAtLength(local);
+      out[i * 3] = (pt.x - vb.x - vb.width / 2) / m;
+      out[i * 3 + 1] = -(pt.y - vb.y - vb.height / 2) / m;
+      out[i * 3 + 2] = local / len;
+    }
+    return out;
+  }
+
+  // Give every particle a point on the outline, a sideways jitter and a depth offset.
+  function shapeAttr(samples, phase) {
+    const S = samples.length / 3, a = new Float32Array(N * 3);
+    for (let i = 0; i < N; i++) {
+      const u = (i * 0.6180339887) % 1;
+      const j = Math.floor(u * S);
+      const j1 = Math.max(j - 1, 0) * 3, j2 = Math.min(j + 1, S - 1) * 3;
+      let tx = samples[j2] - samples[j1], ty = samples[j2 + 1] - samples[j1 + 1];
+      const tl = Math.hypot(tx, ty) || 1; tx /= tl; ty /= tl;
+      const across = gauss() * 0.011, lu = samples[j * 3 + 2];
+      a[i * 3] = samples[j * 3] - ty * across;
+      a[i * 3 + 1] = samples[j * 3 + 1] + tx * across;
+      a[i * 3 + 2] = Math.sin(lu * Math.PI * 1.35 + phase) * 0.14 * Math.sin(lu * Math.PI) + gauss() * 0.025;
+    }
+    return a;
+  }
+
+  const stages = [...document.querySelectorAll('.stage')];
+  const shapeData = stages.map((st, k) => shapeAttr(sampleSVG(st.querySelector('svg')), k * 1.7));
+  while (shapeData.length < 3) shapeData.push(new Float32Array(N * 3));
+
+  const vao = gl.createVertexArray();
+  gl.bindVertexArray(vao);
+  function attr(loc, data, size) {
+    const b = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, b);
+    gl.bufferData(gl.ARRAY_BUFFER, data, gl.STATIC_DRAW);
+    gl.enableVertexAttribArray(loc);
+    gl.vertexAttribPointer(loc, size, gl.FLOAT, false, 0, 0);
+  }
+  attr(0, spiral, 3); attr(1, scatter, 3); attr(2, seeds, 4); attr(3, colors, 3);
+  attr(4, shapeData[0], 3); attr(5, shapeData[1], 3); attr(6, shapeData[2], 3);
+
+  gl.enable(gl.BLEND);
+  gl.blendFunc(gl.ONE, gl.ONE);
+  gl.clearColor(0, 0, 0, 0);
+
+  /* ---------- Viewport ---------- */
+  const FOV = 42 * Math.PI / 180, CAM = 8;
+  const worldH = 2 * CAM * Math.tan(FOV / 2);
+  let vw = 0, vh = 0, dpr = 1, wpp = 0;
+  function resize() {
+    vw = innerWidth; vh = innerHeight;
+    dpr = Math.min(devicePixelRatio || 1, 2);
+    canvas.width = Math.round(vw * dpr);
+    canvas.height = Math.round(vh * dpr);
+    gl.viewport(0, 0, canvas.width, canvas.height);
+    const aspect = vw / vh, f = 1 / Math.tan(FOV / 2), n = 0.1, fa = 80;
+    gl.uniformMatrix4fv(U.uProj, false, [f / aspect, 0, 0, 0, 0, f, 0, 0, 0, 0, (fa + n) / (n - fa), -1, 0, 0, (2 * fa * n) / (n - fa), 0]);
+    wpp = worldH / vh;
+    const worldW = worldH * aspect;
+    gl.uniform1f(U.uAspect, aspect);
+    gl.uniform1f(U.uPR, dpr);
+    gl.uniform1f(U.uGalScale, Math.min(1, aspect * 1.15));
+    gl.uniform2f(U.uField, worldW * 1.1, worldH * 1.15);
+    const colHalf = (Math.min(620, vw - 40) / 2 + 28) * wpp;
+    gl.uniform1f(U.uTextHalf, vw < 700 ? worldW * 0.15 : Math.min(colHalf, worldW * 0.45));
+  }
+  resize();
+  addEventListener('resize', resize);
+
+  /* ---------- Interaction ---------- */
+  const rot = { x: 0, y: 0 }, rotTarget = { x: 0, y: 0 };
+  let lastDrag = -1e9;
+  document.querySelectorAll('.drag').forEach(el => {
+    let px = 0, py = 0, active = false;
+    el.addEventListener('pointerdown', e => {
+      active = true; px = e.clientX; py = e.clientY;
+      el.dataset.dragging = 'true';
+      el.setPointerCapture(e.pointerId);
+    });
+    el.addEventListener('pointermove', e => {
+      if (!active) return;
+      rotTarget.y += (e.clientX - px) * 0.006;
+      rotTarget.x = Math.max(-0.8, Math.min(0.8, rotTarget.x + (e.clientY - py) * 0.004));
+      px = e.clientX; py = e.clientY; lastDrag = performance.now();
+    });
+    const end = () => { active = false; el.dataset.dragging = 'false'; };
+    el.addEventListener('pointerup', end);
+    el.addEventListener('pointercancel', end);
+    el.addEventListener('keydown', e => {
+      const step = 0.2;
+      if (e.key === 'ArrowLeft') rotTarget.y -= step;
+      else if (e.key === 'ArrowRight') rotTarget.y += step;
+      else if (e.key === 'ArrowUp') rotTarget.x = Math.max(-0.8, rotTarget.x - step);
+      else if (e.key === 'ArrowDown') rotTarget.x = Math.min(0.8, rotTarget.x + step);
+      else return;
+      e.preventDefault(); lastDrag = performance.now();
+    });
+  });
+
+  const pointer = { x: 9, y: 9 };
+  let lens = 0, lastMove = -1e9;
+  addEventListener('pointermove', e => {
+    if (e.pointerType !== 'mouse') return;
+    pointer.x = (e.clientX / vw) * 2 - 1;
+    pointer.y = -((e.clientY / vh) * 2 - 1);
+    lastMove = performance.now();
+  });
+  document.addEventListener('pointerleave', () => { lastMove = -1e9; });
+
+  let introStart = performance.now();
+  document.getElementById('replay').addEventListener('click', () => {
+    introStart = performance.now();
+    hero.classList.remove('play');
+    void hero.offsetWidth;
+    hero.classList.add('play');
+  });
+
+  /* ---------- Frame loop ---------- */
+  const clamp01 = v => Math.max(0, Math.min(1, v));
+  const smooth = (a, b, v) => { const t = clamp01((v - a) / (b - a)); return t * t * (3 - 2 * t); };
+  let last = performance.now();
+
+  function frame(now) {
+    const dt = Math.min(0.05, (now - last) / 1000); last = now;
+    const t = reduceMotion ? 0 : now / 1000;
+    const intro = reduceMotion ? 1 : clamp01((now - introStart) / 4800);
+
+    // Hero → sky
+    const hr = hero.getBoundingClientRect();
+    const disperse = smooth(0, 1, -hr.top / (hr.height * 0.6));
+    hero.style.setProperty('--copy', String(clamp01(1 - disperse * 1.8)));
+
+    // Which figure is near the middle of the screen, and how strongly
+    const w = [0, 0, 0];
+    let sw = 0, cx = 0, cy = 0, sc = 0;
+    stages.forEach((st, k) => {
+      const r = st.getBoundingClientRect();
+      const midY = r.top + r.height * 0.47;
+      const d = Math.abs(midY - vh / 2) / (vh * 0.6);
+      const wk = 1 - smooth(0.25, 0.85, d);
+      if (wk <= 0 || k > 2) return;
+      w[k] = wk; sw += wk;
+      cx += wk * (r.left + r.width / 2 - vw / 2) * wpp;
+      cy += wk * -(midY - vh / 2) * wpp;
+      sc += wk * Math.min(r.width * 0.88, r.height * 0.82) * wpp;
+    });
+    if (sw > 0) { cx /= sw; cy /= sw; sc /= sw; }
+
+    // Drag rotation eases in, then drifts back to facing forward
+    if (now - lastDrag > 2000) { rotTarget.x *= Math.exp(-dt * 0.8); rotTarget.y *= Math.exp(-dt * 0.8); }
+    const ease = 1 - Math.exp(-dt * 6);
+    rot.x += (rotTarget.x - rot.x) * ease;
+    rot.y += (rotTarget.y - rot.y) * ease;
+
+    lens += ((now - lastMove < 1500 ? 1 : 0) - lens) * (1 - Math.exp(-dt * 4));
+
+    gl.uniform1f(U.uTime, t);
+    gl.uniform1f(U.uMotion, reduceMotion ? 0 : 1);
+    gl.uniform1f(U.uIntro, intro);
+    gl.uniform1f(U.uDisperse, disperse);
+    gl.uniform1f(U.uHead, (t * 0.05) % 1);
+    gl.uniform1f(U.uDrift, scrollY * wpp * 0.12);
+    gl.uniform1f(U.uLens, lens);
+    gl.uniform2f(U.uPointer, pointer.x, pointer.y);
+    gl.uniform2f(U.uRot, rot.x, rot.y);
+    gl.uniform2f(U.uShapeRot, 0.12 + rot.x, rot.y + (reduceMotion ? 0 : Math.sin(t * 0.22) * 0.42));
+    gl.uniform3f(U.uShapeW, w[0], w[1], w[2]);
+    gl.uniform2f(U.uShapeCenter, cx, cy);
+    gl.uniform1f(U.uShapeScale, sc || 1);
+
+    gl.clear(gl.COLOR_BUFFER_BIT);
+    gl.drawArrays(gl.POINTS, 0, N);
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+})();
+</script>
