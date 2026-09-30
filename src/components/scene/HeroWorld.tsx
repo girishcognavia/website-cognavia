@@ -113,7 +113,7 @@ function Title({ onWidth }: { onWidth: (w: number) => void }) {
       const m = refs.current[i];
       if (!m) return;
       // letters glide in as the star galaxy forms behind them
-      const e = easeOutExpo(clamp01((t - 1.4 - i * 0.07) / 1.8));
+      const e = easeOutExpo(clamp01((t - 0.25 - i * 0.05) / 1.3));
       m.position.set(
         L.x,
         L.y + Math.sin(t * 0.7 + i * 1.3) * 0.03,

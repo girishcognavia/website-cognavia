@@ -6,6 +6,7 @@ import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { useGSAP } from "@gsap/react";
 import { scrollState } from "@/components/scene/scrollState";
 import { onStageReady } from "@/components/scene/stageReady";
+import HeroAutoAdvance from "./HeroAutoAdvance";
 
 gsap.registerPlugin(ScrollTrigger, useGSAP);
 
@@ -39,8 +40,8 @@ export default function Hero() {
       const intro = gsap.from("[data-intro]", {
         autoAlpha: 0,
         y: 12,
-        duration: 1.4,
-        delay: 2.4,
+        duration: 1.1,
+        delay: 0.9,
         ease: "power3.out",
         stagger: 0.08,
         paused: true,
@@ -58,6 +59,7 @@ export default function Hero() {
 
   return (
     <section className="hero" id="top" ref={sectionRef} aria-label="Cognavia.ai">
+      <HeroAutoAdvance />
       <div className="hero__sticky">
         <h1 className="sr-only">Cognavia.ai — Build smarter with AI. Intelligent solutions for a smarter tomorrow.</h1>
         <div className="hero__overlay">

@@ -27,7 +27,7 @@ export const clamp01 = (x: number) => Math.min(Math.max(x, 0), 1);
 export const easeOutExpo = (x: number) => (x >= 1 ? 1 : 1 - Math.pow(2, -10 * x));
 /** Explosion burst on load: 0 → 1 over ~1.8s */
 /** Hero intro reveal for the orbit lines and orbs: eases in as the star galaxy forms. */
-export const burst = () => easeOutExpo(clamp01((motion.t - 1.2) / 2.2));
+export const burst = () => easeOutExpo(clamp01((motion.t - 0.35) / 1.6));
 
 export function MotionDriver() {
   useEffect(() => {

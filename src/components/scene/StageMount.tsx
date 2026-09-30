@@ -5,8 +5,11 @@ import dynamic from "next/dynamic";
 import { scrollState } from "./scrollState";
 import { resetStageReady } from "./stageReady";
 
-// WebGL only runs in the browser.
-const Stage = dynamic(() => import("./Stage"), { ssr: false });
+// WebGL only runs in the browser. Start fetching the 3D code as soon as this module loads
+// (not after the page has hydrated), so it downloads alongside everything else.
+const loadStage = () => import("./Stage");
+if (typeof window !== "undefined") void loadStage();
+const Stage = dynamic(loadStage, { ssr: false });
 
 /** Fixed, full-screen 3D stage that sits behind every section of the Home view. */
 export default function StageMount() {

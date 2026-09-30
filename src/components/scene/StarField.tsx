@@ -423,7 +423,7 @@ export default function StarField() {
     const t = reduceMotion.current ? 0 : motion.t;
     u.uTime.value = t;
     u.uMotion.value = reduceMotion.current ? 0 : 1;
-    u.uIntro.value = reduceMotion.current ? 1 : clamp01(motion.t / 4.8);
+    u.uIntro.value = reduceMotion.current ? 1 : clamp01(motion.t / 3.2);
     u.uHead.value = (t * 0.05) % 1;
 
     // section progress → formation weights

@@ -11,7 +11,7 @@ import GlobeWorld, { WARMUP_GLOBE, globeLayout } from "./GlobeWorld";
 import ProductsWorld, { LIFT, WARMUP_PRODUCTS, productsLayout, queuePos } from "./ProductsWorld";
 import { productStore } from "@/components/products/productStore";
 import { MotionDriver, clamp01, easeInOutCubic, motion } from "./shared";
-import { markStageReady } from "./stageReady";
+import { markStageReady, markWorldsWarm, setWarmRequest } from "./stageReady";
 import { ABOUT_SETTLE, PRODUCTS_SETTLE, TEAM_SETTLE } from "./scrollState";
 import TeamWorld, { WARMUP_TEAM, teamLayout } from "./TeamWorld";
 import StarField from "./StarField";
@@ -90,13 +90,13 @@ function FocusDriver({ dof }: { dof: React.RefObject<DepthOfFieldEffect | null> 
 }
 
 /**
- * One-time GPU setup, done up front on a black screen before the intro plays.
+ * One-time GPU setup, in two phases so the first view appears fast.
  *
  * The first time anything is drawn, the GPU compiles its shaders and uploads its geometry
- * and textures, which stalls the page. Left to happen on demand, that swallowed the hero's
- * intro on first load and stuttered each section hand-off. So: compile every world (in the
- * background where the browser supports it), render each once off-screen to upload the
- * rest, then signal "ready" — which starts the intro clock and the overlay animation.
+ * and textures, which stalls the page. Phase 1 prepares only what the hero shows (hidden
+ * worlds are skipped by compile) and then starts the intro. Phase 2 prepares the other
+ * sections' worlds right after the intro has landed — or immediately if the visitor heads
+ * down sooner — so the scroll flight to them never stalls.
  */
 function Warmup() {
   const gl = useThree((s) => s.gl);
@@ -132,51 +132,60 @@ function Warmup() {
     };
 
     const nextFrame = () => new Promise<void>((r) => requestAnimationFrame(() => r()));
-
-    const run = async () => {
-      // 1) shaders — async (parallel compile) where supported
+    const compile = async (all: boolean) => {
       try {
-        await withAllVisible(() => gl.compileAsync(scene, camera));
+        await (all ? withAllVisible(() => gl.compileAsync(scene, camera)) : gl.compileAsync(scene, camera));
       } catch {
-        withAllVisible(() => gl.compile(scene, camera));
+        if (all) withAllVisible(() => gl.compile(scene, camera));
+        else gl.compile(scene, camera);
       }
-      if (cancelled) return;
+    };
 
-      // 2) geometry + textures: render each world once, off-screen
-      const target = new THREE.WebGLRenderTarget(256, 256);
-      const cam = new THREE.PerspectiveCamera(100, 1, 0.1, 200);
-      const previous = gl.getRenderTarget();
-      const at = new THREE.Vector3();
-      for (const world of worlds()) {
-        world.getWorldPosition(at);
-        cam.position.set(at.x, at.y, at.z + 16);
-        cam.lookAt(at);
-        withAllVisible(() => {
-          gl.setRenderTarget(target);
-          gl.render(scene, cam);
-        });
-        await nextFrame(); // spread the uploads over a few frames
-        if (cancelled) break;
-      }
-      gl.setRenderTarget(previous);
-      target.dispose();
-
-      // 3) let the hero settle for a couple of frames, then start the show
-      await nextFrame();
+    // Phase 1: the hero only
+    const hero = async () => {
+      await compile(false);
       await nextFrame();
       if (!cancelled) markStageReady();
     };
 
-    // wait for the card font (card artwork redraws once it loads), but never for long
-    const fontReady = document.fonts?.load("700 64px Montserrat") ?? Promise.resolve();
-    const timeout = new Promise((r) => setTimeout(r, 1500));
-    Promise.race([fontReady, timeout])
-      .catch(() => {})
-      .then(() => nextFrame())
-      .then(run)
-      .catch(() => markStageReady()); // never leave the page waiting
+    // Phase 2: everything else
+    let phase2: Promise<void> | null = null;
+    const others = () =>
+      (phase2 ??= (async () => {
+        // card artwork redraws once the web font is in; don't wait long for it
+        const font = document.fonts?.load("700 64px Montserrat") ?? Promise.resolve();
+        await Promise.race([font, new Promise((r) => setTimeout(r, 800))]).catch(() => {});
+        if (cancelled) return;
+        await compile(true);
+        const target = new THREE.WebGLRenderTarget(256, 256);
+        const cam = new THREE.PerspectiveCamera(100, 1, 0.1, 200);
+        const previous = gl.getRenderTarget();
+        const at = new THREE.Vector3();
+        for (const world of worlds()) {
+          if (cancelled) break;
+          world.getWorldPosition(at);
+          cam.position.set(at.x, at.y, at.z + 16);
+          cam.lookAt(at);
+          withAllVisible(() => {
+            gl.setRenderTarget(target);
+            gl.render(scene, cam);
+          });
+          await nextFrame(); // spread the uploads over a few frames
+        }
+        gl.setRenderTarget(previous);
+        target.dispose();
+        if (!cancelled) markWorldsWarm();
+      })());
+
+    setWarmRequest(() => void others());
+    hero()
+      .catch(() => markStageReady()) // never leave the page waiting
+      .then(() => new Promise((r) => setTimeout(r, 1900))) // once the name has landed
+      .then(() => others())
+      .catch(() => markWorldsWarm());
     return () => {
       cancelled = true;
+      setWarmRequest(null);
     };
   }, [gl, scene, camera]);
 
