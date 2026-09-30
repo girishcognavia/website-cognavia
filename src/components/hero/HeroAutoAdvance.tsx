@@ -7,8 +7,8 @@ import { whenWorldsWarm } from "@/components/scene/stageReady";
 const easeInOutCubic = (x: number) => (x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2);
 
 /**
- * The hero is a gateway, not a page to scroll through: the first small scroll, swipe, tap or
- * key press glides straight to "Pioneering" (the fly-through plays on the way), and a flick
+ * The hero is a gateway, not a page to scroll through: the first small scroll, swipe, click,
+ * tap or key press glides straight to "Pioneering" (the fly-through plays on the way), and a flick
  * up from "Pioneering" glides back to the top. Input is held while gliding.
  */
 export default function HeroAutoAdvance() {
@@ -57,11 +57,10 @@ export default function HeroAutoAdvance() {
       void glide(d as 1 | -1);
     };
 
-    let touchY = 0, touchX = 0, moved = false;
+    let touchY = 0, touchX = 0;
     const onTouchStart = (e: TouchEvent) => {
       touchY = e.touches[0].clientY;
       touchX = e.touches[0].clientX;
-      moved = false;
     };
     const onTouchMove = (e: TouchEvent) => {
       if (gliding) {
@@ -70,18 +69,25 @@ export default function HeroAutoAdvance() {
       }
       const dy = touchY - e.touches[0].clientY;
       if (Math.abs(dy) < 8 || Math.abs(dy) < Math.abs(e.touches[0].clientX - touchX)) return;
-      moved = true;
       const d = decide(Math.sign(dy));
       if (!d) return;
       e.preventDefault();
       void glide(d as 1 | -1);
     };
-    // a plain tap on the hero also moves on (links and buttons keep their own behaviour)
-    const onTouchEnd = (e: TouchEvent) => {
-      if (moved || gliding) return;
-      const el = e.target as HTMLElement;
-      if (el.closest("a, button, .site-header")) return;
-      if (window.scrollY < 4) void glide(1);
+    // a click or tap on the hero moves on too — mouse, touch or pen. A drag is left alone
+    // (it rotates the galaxy), and links / buttons keep their own behaviour.
+    let down: { x: number; y: number; t: number } | null = null;
+    const onPointerDown = (e: PointerEvent) => {
+      down = e.isPrimary && e.button === 0 ? { x: e.clientX, y: e.clientY, t: performance.now() } : null;
+    };
+    const onPointerUp = (e: PointerEvent) => {
+      const d = down;
+      down = null;
+      if (!d || gliding) return;
+      const isTap = Math.hypot(e.clientX - d.x, e.clientY - d.y) < 8 && performance.now() - d.t < 600;
+      if (!isTap) return;
+      if ((e.target as HTMLElement).closest("a, button, input, .site-header")) return;
+      if (decide(1) === 1) void glide(1);
     };
 
     const onKey = (e: KeyboardEvent) => {
@@ -113,14 +119,16 @@ export default function HeroAutoAdvance() {
     window.addEventListener("wheel", onWheel, opts);
     window.addEventListener("touchstart", onTouchStart, { capture: true, passive: true });
     window.addEventListener("touchmove", onTouchMove, opts);
-    window.addEventListener("touchend", onTouchEnd, { capture: true, passive: true });
+    window.addEventListener("pointerdown", onPointerDown, { capture: true, passive: true });
+    window.addEventListener("pointerup", onPointerUp, { capture: true, passive: true });
     window.addEventListener("keydown", onKey, opts);
     window.addEventListener("click", onClick, opts);
     return () => {
       window.removeEventListener("wheel", onWheel, opts);
       window.removeEventListener("touchstart", onTouchStart, { capture: true });
       window.removeEventListener("touchmove", onTouchMove, opts);
-      window.removeEventListener("touchend", onTouchEnd, { capture: true });
+      window.removeEventListener("pointerdown", onPointerDown, { capture: true });
+      window.removeEventListener("pointerup", onPointerUp, { capture: true });
       window.removeEventListener("keydown", onKey, opts);
       window.removeEventListener("click", onClick, opts);
     };
