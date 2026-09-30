@@ -5,7 +5,9 @@ import Link from "next/link";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { useGSAP } from "@gsap/react";
-import { scrollState } from "@/components/scene/scrollState";
+import dynamic from "next/dynamic";
+
+const PioneeringScene = dynamic(() => import("@/components/scene/PioneeringScene"), { ssr: false });
 
 gsap.registerPlugin(ScrollTrigger, useGSAP);
 
@@ -14,41 +16,19 @@ export default function About() {
 
   useGSAP(
     () => {
-      const section = sectionRef.current!;
-
-      // Drives the globe assembly in the 3D stage. Starts 60vh early so the globe begins
-      // forming while the hero's letters are still flying apart — one continuous shot.
-      ScrollTrigger.create({
-        trigger: section,
-        start: "top 160%",
-        end: "bottom bottom",
-        onUpdate: (self) => {
-          scrollState.about = self.progress;
-        },
-      });
-
-      // Copy builds in as the globe locks into place, and un-builds on the way back up.
+      // a one-time reveal as the section comes into view (no scroll-scrubbed animation)
       gsap
-        .timeline({
-          scrollTrigger: { trigger: section, start: "top 55%", end: "top top", scrub: true },
-        })
-        .from("[data-reveal]", { autoAlpha: 0, y: 40, stagger: 0.12, ease: "power2.out" })
-        .from("[data-reveal-late]", { autoAlpha: 0, x: 20, stagger: 0.1, ease: "power2.out" }, "<0.3");
-
-      // ...and clears out of the way as the products section arrives.
-      gsap.to([".about__content", ".about__signature", ".about__vertical"], {
-        autoAlpha: 0,
-        y: "-=60", // relative: .about__content is already offset by its CSS centering
-        ease: "none",
-        scrollTrigger: { trigger: section, start: "bottom 150%", end: "bottom 95%", scrub: true },
-      });
+        .timeline({ scrollTrigger: { trigger: sectionRef.current, start: "top 70%", once: true } })
+        .from("[data-reveal]", { autoAlpha: 0, y: 30, duration: 1, stagger: 0.1, ease: "power3.out" })
+        .from("[data-reveal-late]", { autoAlpha: 0, x: 16, duration: 0.9, ease: "power3.out" }, "<0.4");
     },
     { scope: sectionRef },
   );
 
   return (
     <section className="about" id="about" ref={sectionRef} aria-labelledby="about-title">
-      <div className="about__sticky">
+      <div className="about__inner">
+        <PioneeringScene />
         <div className="about__content">
           <p className="about__eyebrow" data-reveal>
             Innovation <span aria-hidden>×</span> Research <span aria-hidden>×</span> Real-world impact
@@ -87,10 +67,6 @@ export default function About() {
           From research
           <br />
           to real impact
-        </p>
-
-        <p className="about__vertical" data-reveal-late>
-          Kognavion AI Labs
         </p>
       </div>
     </section>

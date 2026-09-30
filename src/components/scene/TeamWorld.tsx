@@ -372,7 +372,7 @@ function StageFloor({ y }: { y: number }) {
           <circleGeometry args={[PLATFORM_R, 128]} />
           <MeshReflectorMaterial
             ref={floorMat}
-            resolution={512}
+            resolution={256}
             blur={[260, 80]}
             mixBlur={1}
             mixStrength={2.2}

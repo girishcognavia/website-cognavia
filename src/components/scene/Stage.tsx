@@ -6,15 +6,18 @@ import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { Environment, Lightformer } from "@react-three/drei";
 import { EffectComposer, Bloom, DepthOfField, Noise, Vignette } from "@react-three/postprocessing";
 import type { DepthOfFieldEffect } from "postprocessing";
-import HeroWorld, { CAM_Z } from "./HeroWorld";
-import GlobeWorld, { WARMUP_GLOBE, globeLayout } from "./GlobeWorld";
+import { CAM_Z, HERO_FOCUS, HERO_LIGHT, heroLayout } from "./HeroWorld";
+import { globeLayout } from "./GlobeWorld";
 import ProductsWorld, { LIFT, WARMUP_PRODUCTS, productsLayout, queuePos } from "./ProductsWorld";
 import { productStore } from "@/components/products/productStore";
 import { MotionDriver, clamp01, easeInOutCubic, motion } from "./shared";
-import { markStageReady, markWorldsWarm, setWarmRequest } from "./stageReady";
+import { markWorldsWarm, onStageReady, setWarmRequest } from "./stageReady";
 import { ABOUT_SETTLE, PRODUCTS_SETTLE, TEAM_SETTLE } from "./scrollState";
 import TeamWorld, { WARMUP_TEAM, teamLayout } from "./TeamWorld";
 import StarField from "./StarField";
+import VisibilityLoop from "./VisibilityLoop";
+
+const productsEl = () => document.getElementById("products");
 
 /** How far the camera keeps flying (in z) while section 2 scrolls in. */
 const ABOUT_TRAVEL = 6;
@@ -33,7 +36,7 @@ const handoff3 = () => easeInOutCubic(clamp01(motion.m / TEAM_SETTLE));
 
 /**
  * One continuous camera path for the whole page:
- * hero z 14 → 3.5 (through the exploding title), on to z -2.5 facing the globe,
+ * hero z 14 → 3.5 (past the glass panels and sphere), on to z -2.5 facing the globe,
  * past the breaking globe to z -20.5 facing the product queue, then through the
  * scattering cards to z -38.5 facing the leadership team.
  */
@@ -47,14 +50,18 @@ function Rig() {
     const h = handoff();
     const h2 = handoff2();
     const h3 = handoff3();
-    // calm while flying through, back on at each resting scene
-    const parallax = Math.max(1 - p, h * (1 - Math.sin(h2 * Math.PI)) * (1 - Math.sin(h3 * Math.PI)));
+    // calm while flying through, back on at each resting scene (and half as much on the
+    // hero, which should feel still and composed)
+    const parallax =
+      Math.max(1 - p, h * (1 - Math.sin(h2 * Math.PI)) * (1 - Math.sin(h3 * Math.PI))) * THREE.MathUtils.lerp(0.5, 1, h);
     cam.position.x = THREE.MathUtils.damp(cam.position.x, state.pointer.x * 0.6 * parallax, 2.5, dt);
     camBaseY.v = THREE.MathUtils.damp(camBaseY.v, state.pointer.y * 0.35 * parallax, 2.5, dt);
     // into the team section the camera cranes up and over the stage, then settles to eye level
     const crane = Math.sin(h3 * Math.PI);
     cam.position.y = camBaseY.v + crane * 2.2;
-    cam.position.z = CAM_Z - p * 10.5 - h * ABOUT_TRAVEL - h2 * PRODUCTS_TRAVEL - h3 * TEAM_TRAVEL;
+    // landing: the camera eases in slightly as the hero scene assembles
+    const landing = 1 - Math.pow(1 - clamp01(motion.t / 2.6), 3);
+    cam.position.z = CAM_Z + (1 - landing) * 1.6 - p * 10.5 - h * ABOUT_TRAVEL - h2 * PRODUCTS_TRAVEL - h3 * TEAM_TRAVEL;
     cam.lookAt(0, -crane * 2.4, cam.position.z - CAM_Z);
   });
   return null;
@@ -63,7 +70,7 @@ function Rig() {
 /** Keeps the depth-of-field focus on whatever the camera is looking at. */
 function FocusDriver({ dof }: { dof: React.RefObject<DepthOfFieldEffect | null> }) {
   const size = useThree((s) => s.size);
-  const title = new THREE.Vector3(0, 0, 0);
+  const hero = new THREE.Vector3();
   const card = new THREE.Vector3();
   const focus = useRef(new THREE.Vector3());
   useFrame((_, dt) => {
@@ -72,6 +79,9 @@ function FocusDriver({ dof }: { dof: React.RefObject<DepthOfFieldEffect | null> 
     const aspect = size.width / size.height;
     const globe = globeLayout(aspect).pos;
     const products = productsLayout(aspect);
+    // hero: focus on the sphere
+    const hl = heroLayout(aspect);
+    hero.copy(HERO_FOCUS).multiplyScalar(hl.scale).add(hl.pos);
     // in section 3, focus on the lifted card so it's sharp even when it sits deep in the queue
     const active = productStore.get();
     if (active >= 0) card.copy(queuePos(active)).add(LIFT).multiplyScalar(products.scale).add(products.pos);
@@ -80,33 +90,32 @@ function FocusDriver({ dof }: { dof: React.RefObject<DepthOfFieldEffect | null> 
     focus.current.y = THREE.MathUtils.damp(focus.current.y, card.y, 4, dt);
     focus.current.z = THREE.MathUtils.damp(focus.current.z, card.z, 4, dt);
     effect.target
-      .lerpVectors(title, globe, handoff())
+      .lerpVectors(hero, globe, handoff())
       .lerp(focus.current, handoff2())
       .lerp(teamLayout(aspect).pos, handoff3());
     // shallower blur in section 3: the whole card queue should stay readable
-    effect.bokehScale = THREE.MathUtils.lerp(4, 1.2, handoff2());
+    // barely any blur on the hero (crisp glass), full depth in the sections after it
+    const heroCalm = 1 - Math.min(1, motion.p * 3);
+    effect.bokehScale = THREE.MathUtils.lerp(THREE.MathUtils.lerp(4, 0.6, heroCalm), 1.2, handoff2());
   });
   return null;
 }
 
 /**
- * One-time GPU setup, in two phases so the first view appears fast.
- *
- * The first time anything is drawn, the GPU compiles its shaders and uploads its geometry
- * and textures, which stalls the page. Phase 1 prepares only what the hero shows (hidden
- * worlds are skipped by compile) and then starts the intro. Phase 2 prepares the other
- * sections' worlds right after the intro has landed — or immediately if the visitor heads
- * down sooner — so the scroll flight to them never stalls.
+ * One-time GPU setup for the products and team worlds: the first time anything is drawn,
+ * the GPU compiles its shaders and uploads its geometry and textures, which would stall the
+ * scroll flight. Done quietly after the hero has landed, or sooner on request.
  */
 function Warmup() {
   const gl = useThree((s) => s.gl);
   const scene = useThree((s) => s.scene);
   const camera = useThree((s) => s.camera);
+  const invalidate = useThree((s) => s.invalidate);
 
   useEffect(() => {
     let cancelled = false;
     const worlds = () =>
-      [WARMUP_GLOBE, WARMUP_PRODUCTS, WARMUP_TEAM]
+      [WARMUP_PRODUCTS, WARMUP_TEAM]
         .map((n) => scene.getObjectByName(n))
         .filter((o): o is THREE.Object3D => !!o);
 
@@ -141,13 +150,6 @@ function Warmup() {
       }
     };
 
-    // Phase 1: the hero only
-    const hero = async () => {
-      await compile(false);
-      await nextFrame();
-      if (!cancelled) markStageReady();
-    };
-
     // Phase 2: everything else
     let phase2: Promise<void> | null = null;
     const others = () =>
@@ -174,20 +176,28 @@ function Warmup() {
         }
         gl.setRenderTarget(previous);
         target.dispose();
-        if (!cancelled) markWorldsWarm();
+        if (!cancelled) {
+          markWorldsWarm();
+          // one full frame through the post-processing chain while still hidden behind the
+          // opaque sections above, so its buffers exist before the stage goes live
+          invalidate();
+        }
       })());
 
+    // prepare the products and team worlds once the hero has landed (its own canvas signals
+    // "ready"), or immediately if the visitor heads down sooner
     setWarmRequest(() => void others());
-    hero()
-      .catch(() => markStageReady()) // never leave the page waiting
-      .then(() => new Promise((r) => setTimeout(r, 1900))) // once the name has landed
-      .then(() => others())
-      .catch(() => markWorldsWarm());
+    let timer = 0;
+    const unsubscribe = onStageReady(() => {
+      timer = window.setTimeout(() => void others().catch(() => markWorldsWarm()), 2900);
+    });
     return () => {
       cancelled = true;
+      unsubscribe();
+      window.clearTimeout(timer);
       setWarmRequest(null);
     };
-  }, [gl, scene, camera]);
+  }, [gl, scene, camera, invalidate]);
 
   return null;
 }
@@ -205,8 +215,11 @@ function WorldLights() {
   const team = teamLayout(aspect);
   const at = (base: { pos: THREE.Vector3; scale: number }, offset: [number, number, number]) =>
     new THREE.Vector3(...offset).multiplyScalar(base.scale).add(base.pos).toArray();
+  const hero = heroLayout(aspect);
   return (
     <>
+      {/* kept (so the light count never changes) but dark: its highlight on the glass read as a stray dot */}
+      <pointLight position={at(hero, HERO_LIGHT)} intensity={0} distance={7} />
       <pointLight position={at(globe, [3.5, -1.5, 3])} intensity={25} distance={12} />
       <pointLight position={at(products, [-3, 3, 4])} intensity={30} distance={14} />
       <pointLight position={at(team, [0, 4.5, 5.5])} intensity={16} distance={14} />
@@ -219,7 +232,8 @@ export default function Stage() {
 
   return (
     <Canvas
-      dpr={[1, 1.75]}
+      frameloop="demand"
+      dpr={[1, 1.25]}
       camera={{ fov: 35, position: [0, 0, CAM_Z], near: 0.1, far: 100 }}
       gl={{ antialias: false, powerPreference: "high-performance" }}
     >
@@ -240,21 +254,23 @@ export default function Stage() {
 
       <Suspense fallback={null}>
         <MotionDriver />
-        <HeroWorld />
-        <GlobeWorld />
+        {/* the hero and Pioneering sections have their own canvases now; this stage carries
+            the scroll-driven flight from the products section on */}
         <ProductsWorld />
         <TeamWorld />
         <StarField />
         <Warmup />
+        {/* go live as the products section scrolls in (it is pre-rendered while hidden) */}
+        <VisibilityLoop target={productsEl} rootMargin="0px 0px 5% 0px" />
       </Suspense>
 
       <Rig />
       <FocusDriver dof={dof} />
 
-      <EffectComposer multisampling={4}>
-        <DepthOfField ref={dof} target={[0, 0, 0]} worldFocusRange={6} bokehScale={4} />
-        <Bloom mipmapBlur intensity={0.5} luminanceThreshold={0.72} luminanceSmoothing={0.2} />
-        <Noise premultiply opacity={0.3} />
+      <EffectComposer multisampling={0}>
+        <DepthOfField ref={dof} target={[0, 0, 0]} worldFocusRange={6} bokehScale={4} resolutionScale={0.5} />
+        <Bloom mipmapBlur intensity={0.5} luminanceThreshold={0.72} luminanceSmoothing={0.2} resolutionScale={0.5} />
+        <Noise premultiply opacity={0.18} />
         <Vignette offset={0.22} darkness={0.9} />
       </EffectComposer>
     </Canvas>

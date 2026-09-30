@@ -41,7 +41,8 @@ export default function SiteHeader() {
   const [active, setActive] = useState(1);
   const [productsOpen, setProductsOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false); // phones
-  // Home only: reveal after the hero, and track which section is on screen
+  // Home only: the side indicator appears after the hero (the header itself shows from the
+  // first section — see globals.css), and track which section is on screen
   useGSAP(
     () => {
       if (!isHome) return;

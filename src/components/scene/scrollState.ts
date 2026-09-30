@@ -17,5 +17,8 @@ export const ABOUT_SETTLE = 160 / 260;
 /** products-progress at which section 3 is fully in place (same 260vh range as about). */
 export const PRODUCTS_SETTLE = 160 / 260;
 
-/** team-progress at which section 4 is fully in place (same 260vh range). */
-export const TEAM_SETTLE = 160 / 260;
+/**
+ * team-progress at which section 4 is fully in place: ~98vh into its scroll range, which runs
+ * from 60vh before the section to its end (150vh section → 110vh range).
+ */
+export const TEAM_SETTLE = 98 / 110;

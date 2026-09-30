@@ -6,7 +6,7 @@ import { useFrame, useThree } from "@react-three/fiber";
 import { globeLayout } from "./GlobeWorld";
 import { productsLayout, queuePos } from "./ProductsWorld";
 import { BUBBLE, ORBIT_ROLL, PLATFORM_R, PLATFORM_Z, teamLayout } from "./TeamWorld";
-import { ABOUT_SETTLE, PRODUCTS_SETTLE, TEAM_SETTLE } from "./scrollState";
+import { PRODUCTS_SETTLE, TEAM_SETTLE } from "./scrollState";
 import { clamp01, interaction, motion, rng } from "./shared";
 
 /**
@@ -143,6 +143,8 @@ function teamShape(n: number, rand: Rand, aspect: number) {
 const vertexShader = /* glsl */ `
   uniform float uTime, uIntro, uHeroOut, uGlobeIn, uGlobeOut, uProdIn, uProdOut, uTeamIn;
   uniform float uPR, uAspect, uLens, uHead, uMotion, uGalS, uGlobeS, uProdS, uTeamS;
+  uniform float uGalaxy;    // 0: no galaxy forms on the hero (the hero is a quiet studio scene)
+  uniform float uHeroStars; // stars fade in only once the visitor leaves the hero
   uniform vec3 uCam, uGalA, uGlobeA, uProdA, uTeamA;
   uniform vec2 uDrag, uPointer;
 
@@ -203,7 +205,7 @@ const vertexShader = /* glsl */ `
     float st = 0.10 + s * 0.18;
     float l = clamp((uIntro - st) / (0.58 + aSeed.z * 0.1), 0.0, 1.0);
     float sm = l * l * l * (l * (l * 6.0 - 15.0) + 10.0);
-    float pull = mix(sm, sin(sm * 1.5707963), 0.5) * (1.0 - bg);
+    float pull = mix(sm, sin(sm * 1.5707963), 0.5) * (1.0 - bg) * uGalaxy;
     vec3 pos = gather(sky, galaxy, uGalA, pull, s);
 
     // Section by section: dissolve into the sky, gather into the next formation
@@ -247,6 +249,7 @@ const vertexShader = /* glsl */ `
     float dist = -mv.z;
     vec4 clip = projectionMatrix * mv;
     alpha *= smoothstep(0.8, 2.2, dist);   // no stars poking the lens
+    alpha *= uHeroStars;
 
     // Pointer lens: push stars apart and brighten them
     vec2 ndc = clip.xy / clip.w;
@@ -340,6 +343,8 @@ export default function StarField() {
           uLens: { value: 0 },
           uHead: { value: 0 },
           uMotion: { value: 1 },
+          uGalaxy: { value: 0 },
+          uHeroStars: { value: 0 },
           uGalS: { value: 2.9 },
           uGlobeS: { value: 1 },
           uProdS: { value: 1 },
@@ -423,12 +428,15 @@ export default function StarField() {
     const t = reduceMotion.current ? 0 : motion.t;
     u.uTime.value = t;
     u.uMotion.value = reduceMotion.current ? 0 : 1;
-    u.uIntro.value = reduceMotion.current ? 1 : clamp01(motion.t / 3.2);
+    // no galaxy on the hero: stars start in the open sky and simply grow in
+    u.uIntro.value = 1;
     u.uHead.value = (t * 0.05) % 1;
+    // the hero stays a clean black studio; the sky appears as the camera flies out of it
+    u.uHeroStars.value = 1; // this stage now starts at the products section: the sky is simply there
 
     // section progress → formation weights
-    u.uHeroOut.value = clamp01((motion.p - 0.08) / 0.55);
-    u.uGlobeIn.value = clamp01(motion.a / ABOUT_SETTLE);
+    u.uHeroOut.value = 1;
+    u.uGlobeIn.value = 0; // Pioneering has its own scene now: no star formation around a globe
     u.uGlobeOut.value = clamp01((motion.g - 0.02) / 0.4);
     u.uProdIn.value = clamp01(motion.g / PRODUCTS_SETTLE);
     u.uProdOut.value = clamp01((motion.m - 0.02) / 0.4);

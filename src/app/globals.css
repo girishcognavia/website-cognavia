@@ -20,15 +20,17 @@ a { color: inherit; text-decoration: none; }
 
 /* ---------- Hero ---------- */
 
-.hero { position: relative; height: 320vh; }
-
-.hero__sticky {
-  position: sticky;
-  top: 0;
+/* one screen, opaque, scrolled past normally; its 3D scene has its own canvas */
+.hero {
+  position: relative;
   height: 100vh;
   height: 100svh;
+  min-height: 560px;
   overflow: hidden;
+  background: #030303;
 }
+
+.hero__canvas { position: absolute; inset: 0; }
 
 
 .hero__overlay {
@@ -40,131 +42,93 @@ a { color: inherit; text-decoration: none; }
 
 .hero__overlay a { pointer-events: auto; }
 
-.hero__top {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  position: relative;
+/* landing reveal for the copy: held until the 3D scene is ready (html[data-stage-ready]),
+   so the text and the scene start together; html[data-hero-go] is a fallback timer */
+.hero [data-intro] {
+  animation: hero-in 1.3s cubic-bezier(0.16, 1, 0.3, 1) both paused;
 }
-
-.hero__index {
-  position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
-  font-size: 12px;
-  font-weight: 300;
-  letter-spacing: 0.1em;
-  color: var(--ink-soft);
+html[data-stage-ready] .hero [data-intro],
+html[data-hero-go] .hero [data-intro] {
+  animation-play-state: running;
 }
+.hero [data-intro="eyebrow"] { animation-delay: 0s; --rise: 14px; }
+.hero [data-intro="title"] { animation-delay: 0.05s; animation-duration: 1.6s; --rise: 30px; }
+.hero [data-intro="sub"] { animation-delay: 0.3s; --rise: 16px; }
+.hero [data-intro="side"] { animation-delay: 0.6s; --rise: 10px; }
 
-.hero__explore {
-  display: flex;
-  align-items: center;
-  gap: 18px;
-  font-size: 14px;
-  font-weight: 500;
-  letter-spacing: 0.04em;
-}
-
-.hero__explore::before {
-  content: "";
-  width: 52px;
-  height: 1px;
-  background: var(--ink-soft);
-  transition: width 0.4s ease;
-}
-
-.hero__explore:hover::before { width: 72px; }
-
-.hero__axis {
-  position: absolute;
-  left: 50%;
-  top: clamp(88px, 11vh, 120px);
-  bottom: clamp(150px, 18vh, 190px);
-  width: 1px;
-  background: linear-gradient(var(--ink-faint), rgba(255, 255, 255, 0.08) 70%, transparent);
-}
-
-.hero__side {
-  position: absolute;
-  left: clamp(20px, 3.8vw, 72px);
-  top: 50%;
-  transform: translateY(-40%);
-  font-size: 11px;
-  font-weight: 400;
-  line-height: 2.5;
-  letter-spacing: 0.28em;
-  color: var(--ink-soft);
-}
-
-.hero__side::before {
-  content: "";
-  display: block;
-  width: 1px;
-  height: 40px;
-  margin-bottom: 20px;
-  background: var(--ink-soft);
-}
-
-.hero__tagline {
-  position: absolute;
-  right: clamp(20px, 2.5vw, 48px);
-  top: 54%;
-  font-size: 13px;
-  font-weight: 300;
-  line-height: 1.55;
-  color: var(--ink-soft);
-}
-
-.hero__scroll {
-  position: absolute;
-  left: 50%;
-  bottom: clamp(28px, 6vh, 64px);
-  transform: translateX(-50%);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 14px;
-  font-size: 10px;
-  letter-spacing: 0.3em;
-  color: var(--ink-soft);
-}
-
-.hero__mouse {
-  width: 18px;
-  height: 30px;
-  border: 1px solid var(--ink-soft);
-  border-radius: 10px;
-  position: relative;
-}
-
-.hero__mouse::after {
-  content: "";
-  position: absolute;
-  left: 50%;
-  top: 6px;
-  width: 2px;
-  height: 6px;
-  margin-left: -1px;
-  border-radius: 1px;
-  background: var(--ink);
-  animation: wheel 1.8s ease-in-out infinite;
-}
-
-@keyframes wheel {
-  0% { transform: translateY(0); opacity: 1; }
-  70% { transform: translateY(9px); opacity: 0; }
-  100% { transform: translateY(0); opacity: 0; }
-}
-
-@media (max-width: 760px) {
-  .hero__side, .hero__tagline { display: none; }
-  .hero__index { display: none; }
-  .hero__explore::before { width: 28px; }
+@keyframes hero-in {
+  from { opacity: 0; transform: translateY(var(--rise, 16px)); filter: blur(8px); }
+  to { opacity: 1; transform: none; filter: blur(0); }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .hero__mouse::after { animation: none; }
+  .hero [data-intro] { animation: none; }
+}
+
+/* title block, top left */
+.hero__copy {
+  position: absolute;
+  left: 13%;
+  top: 19%;
+  max-width: min(760px, 52vw);
+}
+
+.hero__eyebrow {
+  font-size: clamp(11px, 1vw, 20px);
+  font-weight: 400;
+  letter-spacing: 0.34em;
+  color: rgba(255, 255, 255, 0.82);
+  margin-bottom: clamp(10px, 1.4vw, 26px);
+}
+
+.hero__title {
+  font-size: clamp(52px, 7vw, 150px);
+  font-weight: 700;
+  line-height: 0.95;
+  letter-spacing: -0.02em;
+  color: #f4f4f4;
+  margin-left: -0.04em;
+  margin-bottom: clamp(18px, 2.4vw, 44px);
+}
+
+.hero__title span { font-weight: 300; letter-spacing: 0; color: rgba(255, 255, 255, 0.86); }
+
+.hero__sub {
+  max-width: 24em;
+  font-size: clamp(14px, 1.1vw, 22px);
+  font-weight: 400;
+  line-height: 1.75;
+  letter-spacing: 0.12em;
+  color: rgba(255, 255, 255, 0.78);
+}
+
+/* Smarter Systems. A Brighter Tomorrow. — right */
+.hero__aside {
+  position: absolute;
+  right: 4.8%;
+  top: 57%;
+  display: flex;
+  align-items: flex-start;
+  gap: clamp(14px, 1.2vw, 22px);
+  font-size: clamp(12px, 0.78vw, 15px);
+  font-weight: 400;
+  line-height: 1.9;
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.hero__aside::before {
+  content: "";
+  width: clamp(36px, 3vw, 60px);
+  height: 1px;
+  margin-top: 0.95em;
+  background: rgba(255, 255, 255, 0.45);
+}
+
+@media (max-width: 760px) {
+  .hero__copy { left: 20px; right: 20px; top: 13%; max-width: none; }
+  .hero__title { font-size: 15vw; }
+  .hero__sub { font-size: 13px; letter-spacing: 0.08em; }
+  .hero__aside { display: none; }
 }
 
 /* ---------- 3D stage (fixed behind every section) ---------- */
@@ -340,26 +304,57 @@ a { color: inherit; text-decoration: none; }
 .section-indicator .is-active { color: var(--ink); }
 
 .site-chrome.is-visible .site-header { transform: none; opacity: 1; }
+/* Home: the header is there from the first section, sliding in with the landing animation
+   (same signal as the hero copy: the 3D stage is ready, or the fallback timer fired) */
+html[data-stage-ready] .site-chrome .site-header,
+html[data-hero-go] .site-chrome .site-header { transform: none; opacity: 1; }
 .site-chrome.is-visible .section-indicator { transform: translate(0, -50%); opacity: 1; }
 
 /* ---------- Section 2: About ---------- */
 
-.about { position: relative; height: 200vh; }
+/* one screen, opaque, scrolled past normally; the 3D scene has its own canvas */
+.about {
+  position: relative;
+  min-height: 100vh;
+  min-height: 100svh;
+  background: #050505;
+}
 
-.about__sticky {
-  position: sticky;
-  top: 0;
-  height: 100vh;
-  height: 100svh;
+.about__inner {
+  position: relative;
+  min-height: inherit;
+  display: flex;
+  align-items: center;
   overflow: hidden;
 }
 
-.about__content {
+/* the scene fills the right side and feathers into the page */
+.pioneering__canvas {
   position: absolute;
-  left: clamp(20px, 8.5vw, 170px);
-  top: 50%;
-  transform: translateY(-46%);
-  max-width: min(720px, 48vw);
+  top: 0;
+  bottom: 0;
+  right: 0;
+  width: 62%;
+  pointer-events: auto;
+}
+
+/* feather the scene's left edge into the page with an overlay (a CSS mask on a live WebGL
+   canvas is expensive to composite every frame, and showed up as scroll jank) */
+.pioneering__canvas::after {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 24%;
+  background: linear-gradient(90deg, #050505, rgba(5, 5, 5, 0));
+  pointer-events: none;
+}
+
+.about__content {
+  position: relative;
+  z-index: 1;
+  margin-left: clamp(20px, 8.5vw, 170px);
+  max-width: min(640px, 42vw);
+  padding: 96px 0 64px;
 }
 
 .about__eyebrow {
@@ -374,7 +369,7 @@ a { color: inherit; text-decoration: none; }
 .about__eyebrow span { margin: 0 0.9em; letter-spacing: 0; color: var(--ink-soft); }
 
 .about__title {
-  font-size: clamp(40px, 4.6vw, 80px);
+  font-size: clamp(36px, min(4.6vw, 8.5vh), 80px);
   font-weight: 500;
   line-height: 1.04;
   letter-spacing: -0.02em;
@@ -392,9 +387,9 @@ a { color: inherit; text-decoration: none; }
 }
 
 .about__body {
-  font-size: 16px;
+  font-size: clamp(14px, 2.1vh, 16px);
   font-weight: 400;
-  line-height: 1.85;
+  line-height: 1.8;
   color: rgba(255, 255, 255, 0.72);
   max-width: 34em;
   margin-bottom: 26px;
@@ -428,8 +423,9 @@ a { color: inherit; text-decoration: none; }
 
 .about__signature {
   position: absolute;
-  right: clamp(20px, 13vw, 260px);
-  bottom: 18vh;
+  z-index: 1;
+  right: clamp(20px, 5vw, 96px);
+  bottom: 8vh;
   display: flex;
   align-items: flex-start;
   gap: 22px;
@@ -460,18 +456,6 @@ a { color: inherit; text-decoration: none; }
   border-radius: 50%;
 }
 
-.about__vertical {
-  position: absolute;
-  right: clamp(14px, 3.6vw, 70px);
-  bottom: 16vh;
-  writing-mode: vertical-rl;
-  transform: rotate(180deg);
-  font-size: 11px;
-  font-weight: 500;
-  letter-spacing: 0.32em;
-  text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.75);
-}
 
 /* ---------- Section 3: Products ---------- */
 
@@ -580,7 +564,7 @@ a { color: inherit; text-decoration: none; }
 
 /* ---------- Section 4: Leadership team ---------- */
 
-.team { position: relative; height: 200vh; } /* short dwell, then the footer */
+.team { position: relative; height: 150vh; } /* the stage settles ~38vh in; the footer follows right after */
 
 .team__sticky {
   position: sticky;
@@ -1327,20 +1311,17 @@ a { color: inherit; text-decoration: none; }
   .site-nav__dropdown.is-open .site-nav__menu { display: block; transform: none; }
   .section-indicator { display: none; }
 
-  .about__content {
-    left: 20px;
-    right: 20px;
-    top: auto;
-    bottom: 7vh;
-    transform: none;
-  }
+  .about__inner { flex-direction: column; }
+  .pioneering__canvas { position: relative; width: 100%; height: 52vh; }
+  .pioneering__canvas::after { inset: auto 0 0 0; width: auto; height: 20%; background: linear-gradient(rgba(5, 5, 5, 0), #050505); }
+  .about__content { margin: 0 20px; max-width: none; padding: 0 0 72px; }
   .about__eyebrow { font-size: 9px; letter-spacing: 0.2em; margin-bottom: 12px; }
   .about__eyebrow span { margin: 0 0.5em; }
   .about__title { font-size: 38px; margin-bottom: 18px; }
   .about__body { font-size: 13.5px; line-height: 1.65; margin-bottom: 12px; }
   .about__body + .about__body { display: none; }
   .about__cta { margin-top: 10px; }
-  .about__signature, .about__vertical { display: none; }
+  .about__signature { display: none; }
 
   .products__intro { left: 20px; right: 20px; top: 88px; max-width: none; }
   .products__title { font-size: 38px; margin-bottom: 10px; }
