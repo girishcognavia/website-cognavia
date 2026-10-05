@@ -1,4 +1,4 @@
-// Footer content — edit freely. Anything in [square brackets] is a placeholder to replace.
+// Footer content — edit freely. Links left as "#" are hidden until a real address is filled in.
 import { PRODUCTS, productHref } from "@/components/products/productsData";
 
 export const FOOTER = {
@@ -15,8 +15,8 @@ export const FOOTER = {
       links: [
         { label: "About us", href: "/about" },
         { label: "Leadership", href: "/#team-view" },
-        { label: "Customer stories", href: "#" }, // [link to reviews / customers page]
-        { label: "Contact", href: "#contact" },
+        { label: "Customer stories", href: "/customers" },
+        { label: "Contact", href: "/contact" },
       ],
     },
     {
@@ -29,9 +29,9 @@ export const FOOTER = {
   ],
 
   contact: {
-    email: "[email address]",
-    phone: "[phone number]",
-    address: ["[Street address]", "[City, State PIN]", "India"],
+    email: "hello@cognavia.ai",
+    phone: "+91 9019538667",
+    address: ["Kristal Jasper, Villa No.3J123", "Near Amrita Engineering College,", "Bangalore"],
   },
 
   social: [

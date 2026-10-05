@@ -25,8 +25,8 @@ const NAV = [
   { label: "Home", href: "/", match: (p: string) => p === "/" },
   { label: "About us", href: "/about", match: (p: string) => p === "/about" },
   { label: "Products", href: "/products", match: (p: string) => p.startsWith("/products"), dropdown: true },
-  { label: "Customers", href: "#", match: () => false }, // [customers view — not built yet]
-  { label: "Contact us", href: "#contact", match: () => false },
+  { label: "Customers", href: "/customers", match: (p: string) => p === "/customers" },
+  { label: "Contact us", href: "/contact", match: (p: string) => p === "/contact" },
 ];
 
 /**

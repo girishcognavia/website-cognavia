@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import dynamic from "next/dynamic";
 import type { Callout, HeadShared } from "./AndroidHead";
 
@@ -22,21 +22,15 @@ export default function AboutVisual() {
     overlay: null,
     callouts: CALLOUTS.map((c): Callout => ({ anchor: c.anchor, part: c.part, el: null, line: null, dot: null })),
   });
-  const [active, setActive] = useState(true);
 
   useEffect(() => {
     shared.current.overlay = overlay.current;
-    const el = container.current;
-    if (!el) return;
-    const io = new IntersectionObserver(([e]) => setActive(e.isIntersecting), { rootMargin: "100px" });
-    io.observe(el);
-    return () => io.disconnect();
   }, []);
 
   return (
     <div className="android" ref={container}>
       <div className="android__canvas" aria-hidden>
-        <AndroidHead shared={shared.current} container={container} active={active} />
+        <AndroidHead shared={shared.current} container={container} />
       </div>
       <div className="android__overlay" ref={overlay} aria-hidden>
         <svg className="android__lines">

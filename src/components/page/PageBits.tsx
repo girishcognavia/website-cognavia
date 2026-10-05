@@ -79,12 +79,12 @@ export function ContactCta({ title = "Want to see it in action?" }: { title?: st
   return (
     <aside className="page__cta">
       <p>{title}</p>
-      <a href="#contact" className="page__cta-link">
+      <Link href="/contact" className="page__cta-link">
         Contact us
         <span className="page__arrow" aria-hidden>
           →
         </span>
-      </a>
+      </Link>
     </aside>
   );
 }

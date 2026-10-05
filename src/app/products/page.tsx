@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { PRODUCTS, productHref } from "@/components/products/productsData";
-import { Breadcrumbs, ContactCta, PageShell } from "@/components/page/PageBits";
-import { OG_IMAGE } from "@/lib/site";
+import { Breadcrumbs, ContactCta, JsonLd, PageShell } from "@/components/page/PageBits";
+import { OG_IMAGE, SITE } from "@/lib/site";
 
 const DESCRIPTION = "Powerful AI products designed for specific enterprise needs.";
 
@@ -42,6 +42,27 @@ export default function ProductsPage() {
       </ul>
 
       <ContactCta />
+
+      <JsonLd
+        data={{
+          "@context": "https://schema.org",
+          "@type": "CollectionPage",
+          name: "Our Intelligent Suite",
+          description: DESCRIPTION,
+          url: `${SITE.url}/products`,
+          publisher: { "@id": `${SITE.url}/#organization` },
+          mainEntity: {
+            "@type": "ItemList",
+            itemListElement: PRODUCTS.map((p, i) => ({
+              "@type": "ListItem",
+              position: i + 1,
+              url: `${SITE.url}${productHref(p)}`,
+              name: p.name,
+              description: p.detail?.overview.tagline ?? p.description,
+            })),
+          },
+        }}
+      />
     </PageShell>
   );
 }

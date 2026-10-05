@@ -25,7 +25,29 @@ export default function StructuredData() {
       parentOrganization: { "@type": "Organization", name: SITE.legalName },
       ...(isFilled(contact.email) && { email: contact.email }),
       ...(isFilled(contact.phone) && { telephone: contact.phone }),
-      ...(address.length && { address: { "@type": "PostalAddress", streetAddress: address.join(", ") } }),
+      ...(address.length && {
+        address: {
+          "@type": "PostalAddress",
+          // street lines first; the last line is the city
+          streetAddress: address
+            .slice(0, -1)
+            .map((l) => l.replace(/,\s*$/, ""))
+            .join(", "),
+          addressLocality: address[address.length - 1],
+          addressRegion: "Karnataka",
+          addressCountry: "IN",
+        },
+      }),
+      ...(isFilled(contact.email) && {
+        contactPoint: {
+          "@type": "ContactPoint",
+          contactType: "sales",
+          email: contact.email,
+          ...(isFilled(contact.phone) && { telephone: contact.phone.replace(/\s/g, "") }),
+          url: `${SITE.url}/contact`,
+          availableLanguage: ["English", "Hindi"],
+        },
+      }),
       ...(sameAs.length && { sameAs }),
       founder: TEAM.map((l) => ({ "@id": `${SITE.url}/#${slug(l.name)}` })),
     },

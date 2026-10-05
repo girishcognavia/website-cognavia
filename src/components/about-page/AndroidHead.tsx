@@ -5,6 +5,8 @@ import * as THREE from "three";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { Environment, Lightformer, Line } from "@react-three/drei";
 import { Bloom, EffectComposer, Noise, Vignette } from "@react-three/postprocessing";
+import Prepare from "@/components/scene/Prepare";
+import VisibilityLoop from "@/components/scene/VisibilityLoop";
 import type { Line2, LineSegments2 } from "three-stdlib";
 
 /**
@@ -837,16 +839,14 @@ function IntroPulse() {
 export default function AndroidHead({
   shared,
   container,
-  active,
 }: {
   shared: HeadShared;
   container: React.RefObject<HTMLDivElement | null>;
-  active: boolean;
 }) {
   return (
     <Canvas
       dpr={[1, 1.75]}
-      frameloop={active ? "always" : "never"}
+      frameloop="always"
       camera={{ fov: 30, position: [0, -1.4, 11.2], near: 0.1, far: 50 }}
       gl={{ antialias: false, powerPreference: "high-performance" }}
       onPointerMissed={() => (document.body.style.cursor = "")}
@@ -872,6 +872,8 @@ export default function AndroidHead({
       <Head shared={shared} />
       <Hud />
 
+      <Prepare />
+      <VisibilityLoop target={container} rootMargin="100px" />
       <EffectComposer multisampling={4}>
         <Bloom mipmapBlur intensity={0.9} luminanceThreshold={0.9} luminanceSmoothing={0.15} />
         <Noise premultiply opacity={0.25} />

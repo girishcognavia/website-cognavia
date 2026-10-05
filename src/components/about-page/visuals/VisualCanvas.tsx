@@ -1,6 +1,8 @@
 "use client";
 
 import { createContext, useContext, useEffect, useRef, useState } from "react";
+import Prepare from "@/components/scene/Prepare";
+import VisibilityLoop from "@/components/scene/VisibilityLoop";
 import { Canvas } from "@react-three/fiber";
 import { Environment, Lightformer } from "@react-three/drei";
 import { Bloom, EffectComposer, Vignette } from "@react-three/postprocessing";
@@ -13,8 +15,10 @@ export const useVisualPointer = () => useContext(PointerContext);
 
 /**
  * Shared shell for the About visuals: studio reflections, bloom, pointer tracking,
- * and rendering only while on screen.
+ * and rendering only while on screen. Each scene is readied right after the page loads (a few
+ * hundred ms apart), so scrolling it into view never stalls.
  */
+let order = 0;
 export default function VisualCanvas({
   children,
   camera = { position: [0, 0, 8] as [number, number, number], fov: 32 },
@@ -28,13 +32,11 @@ export default function VisualCanvas({
 }) {
   const box = useRef<HTMLDivElement>(null);
   const pointer = useRef<VisualPointer>({ x: 0, y: 0, inside: false, lastMove: 0 });
-  const [active, setActive] = useState(false);
+  const [prepareDelay] = useState(() => 250 + order++ * 220);
 
   useEffect(() => {
     const el = box.current;
     if (!el) return;
-    const io = new IntersectionObserver(([e]) => setActive(e.isIntersecting), { rootMargin: "120px" });
-    io.observe(el);
     const move = (e: PointerEvent) => {
       const r = el.getBoundingClientRect();
       const p = pointer.current;
@@ -47,7 +49,6 @@ export default function VisualCanvas({
     window.addEventListener("pointermove", move);
     document.addEventListener("pointerleave", leave);
     return () => {
-      io.disconnect();
       window.removeEventListener("pointermove", move);
       document.removeEventListener("pointerleave", leave);
     };
@@ -59,7 +60,7 @@ export default function VisualCanvas({
         <PointerContext.Provider value={pointer.current}>
           <Canvas
             dpr={[1, 1.75]}
-            frameloop={active ? "always" : "never"}
+            frameloop="never"
             camera={{ ...camera, near: 0.1, far: 60 }}
             gl={{ antialias: false, powerPreference: "high-performance" }}
           >
@@ -73,6 +74,8 @@ export default function VisualCanvas({
               <Lightformer form="rect" intensity={0.8} position={[0, -5, 2]} rotation={[Math.PI / 2, 0, 0]} scale={[8, 2, 1]} />
             </Environment>
             {children}
+            <Prepare delay={prepareDelay} />
+            <VisibilityLoop target={box} rootMargin="160px" />
             <EffectComposer multisampling={4}>
               <Bloom mipmapBlur intensity={0.85} luminanceThreshold={0.9} luminanceSmoothing={0.15} />
               <Vignette offset={0.25} darkness={0.85} />

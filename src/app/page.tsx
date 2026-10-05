@@ -1,4 +1,3 @@
-import StageMount from "@/components/scene/StageMount";
 import Hero from "@/components/hero/Hero";
 import About from "@/components/about/About";
 import Products from "@/components/products/Products";
@@ -9,7 +8,6 @@ export default function Home() {
   return (
     <>
       <StructuredData />
-      <StageMount />
       <main className="home-main">
         <Hero />
         <About />

@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { PRODUCTS, findProduct, productHref } from "@/components/products/productsData";
 import { Breadcrumbs, ContactCta, JsonLd, PageShell, Sections } from "@/components/page/PageBits";
+import ProductDetail from "@/components/products/detail/ProductDetail";
 import { OG_IMAGE, SITE } from "@/lib/site";
 
 type Params = { params: Promise<{ slug: string }> };
@@ -16,12 +17,13 @@ export function generateStaticParams() {
 export async function generateMetadata({ params }: Params): Promise<Metadata> {
   const p = findProduct((await params).slug);
   if (!p) return {};
-  const title = `${p.name} — ${p.tag} | Cognavia.ai`;
+  const title = p.detail ? `${p.name} — ${p.detail.overview.tagline} | Cognavia.ai` : `${p.name} — ${p.tag} | Cognavia.ai`;
+  const description = p.detail?.overview.body ?? p.description;
   return {
     title,
-    description: p.description,
+    description,
     alternates: { canonical: productHref(p) },
-    openGraph: { title, description: p.description, url: productHref(p), images: [OG_IMAGE] },
+    openGraph: { title, description, url: productHref(p), images: [OG_IMAGE] },
   };
 }
 
@@ -33,23 +35,30 @@ export default async function ProductPage({ params }: Params) {
 
   return (
     <PageShell>
-      <header className="page__hero">
-        <Breadcrumbs
-          trail={[
-            { label: "Products", href: "/products" },
-            { label: p.name, href: productHref(p) },
-          ]}
-        />
-        <p className="page__eyebrow">
-          0{index + 1} · {p.tag}
-        </p>
-        <h1 className="page__title">{p.name}</h1>
-        <p className="page__lede">{p.description}</p>
-      </header>
+      <Breadcrumbs
+        trail={[
+          { label: "Products", href: "/products" },
+          { label: p.name, href: productHref(p) },
+        ]}
+      />
 
-      <Sections sections={p.sections} pending={`Full details on ${p.name} are coming soon.`} />
+      {p.detail ? (
+        <ProductDetail product={p} index={index} />
+      ) : (
+        <>
+          <header className="page__hero">
+            <p className="page__eyebrow">
+              0{index + 1} · {p.tag}
+            </p>
+            <h1 className="page__title">{p.name}</h1>
+            <p className="page__lede">{p.description}</p>
+          </header>
 
-      <ContactCta title={`Interested in ${p.name}?`} />
+          <Sections sections={p.sections} pending={`Full details on ${p.name} are coming soon.`} />
+
+          <ContactCta title={`Interested in ${p.name}?`} />
+        </>
+      )}
 
       <nav className="page__others" aria-label="Other products">
         <h2 className="page__h2">More from the suite</h2>
@@ -79,6 +88,12 @@ export default async function ProductPage({ params }: Params) {
           operatingSystem: "Web",
           url: `${SITE.url}${productHref(p)}`,
           publisher: { "@id": `${SITE.url}/#organization` },
+          ...(p.detail && {
+            alternateName: p.detail.overview.tagline,
+            featureList: p.detail.features,
+            audience: p.detail.useCases.map((u) => ({ "@type": "BusinessAudience", name: u })),
+            ...(p.detail.live && { sameAs: [p.detail.live.url], installUrl: p.detail.live.url }),
+          }),
         }}
       />
     </PageShell>

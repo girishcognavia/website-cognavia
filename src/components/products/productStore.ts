@@ -1,5 +1,5 @@
-// Which product card is "lifted" out of the queue. Shared by the 3D cards (read every
-// frame) and the HTML product list (re-renders via useSyncExternalStore).
+// Which product is pointed at in the Home products section. Shared by the card art (lifts
+// the card) and the product list (re-renders via useSyncExternalStore).
 import { useSyncExternalStore } from "react";
 
 let active = -1;
