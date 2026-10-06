@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import Script from "next/script";
 import "@fontsource/montserrat/300.css";
 import "@fontsource/montserrat/400.css";
 import "@fontsource/montserrat/500.css";
@@ -49,6 +50,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           {children}
           <Footer />
         </SmoothScroll>
+        {/* CognaAssist chat widget on every page; loads once, after the page is interactive */}
+        <Script
+          id="cognaassist-widget"
+          src="https://chat.cognavia.ai/embed.js"
+          data-api-key="ca_1v4wRoOZ0duu3pdORYGRzL9URKUj57MlmCTVg3aTq7g"
+          strategy="afterInteractive"
+        />
       </body>
     </html>
   );

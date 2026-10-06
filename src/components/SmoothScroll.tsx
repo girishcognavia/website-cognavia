@@ -16,7 +16,13 @@ export default function SmoothScroll({ children }: { children: React.ReactNode }
   const pathname = usePathname();
 
   useEffect(() => {
-    lenis = new Lenis({ lerp: 0.09, wheelMultiplier: 0.9, anchors: true });
+    lenis = new Lenis({
+      lerp: 0.09,
+      wheelMultiplier: 0.9,
+      anchors: true,
+      // the CognaAssist chat widget (elements with cog- ids) scrolls natively
+      prevent: (node) => !!node.closest?.('[id^="cog-"]'),
+    });
     lenis.on("scroll", ScrollTrigger.update);
 
     const tick = (time: number) => lenis?.raf(time * 1000);
