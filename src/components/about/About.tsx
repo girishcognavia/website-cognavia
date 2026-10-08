@@ -1,7 +1,6 @@
 "use client";
 
 import { useRef } from "react";
-import Link from "next/link";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { useGSAP } from "@gsap/react";
@@ -46,28 +45,25 @@ export default function About() {
             application. Founded with a vision to democratize AI technology, we bridge the gap between cutting-edge
             research and real-world business solutions.
           </p>
-          <p className="about__body" data-reveal>
+          <span className="about__rule" aria-hidden data-reveal />
+          <p className="about__mission" data-reveal>
             Our mission is to empower organizations of all sizes to harness the transformative power of artificial
             intelligence, driving growth, efficiency, and innovation across industries.
           </p>
-
-          <Link href="/about" className="about__cta" data-reveal>
-            <span className="about__cta-line" aria-hidden />
-            Learn more
-            <span className="about__cta-circle" aria-hidden>
-              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                <path d="M1 7h12M8 2l5 5-5 5" stroke="currentColor" strokeWidth="1.2" />
-              </svg>
-            </span>
-          </Link>
         </div>
 
         <p className="about__signature" data-reveal-late>
           <span className="about__signature-mark" aria-hidden />
-          From research
-          <br />
-          to real impact
+          Built for a smarter tomorrow
         </p>
+
+        {/* the four capabilities shown on the glass cards, for screen readers and search */}
+        <ul className="sr-only">
+          <li>AI Agents: Autonomous systems that get work done.</li>
+          <li>Cloud &amp; Infrastructure: Scalable. Secure. Always on.</li>
+          <li>Custom Solutions: Tailored AI systems for your business.</li>
+          <li>Data &amp; Analytics: Turn data into decisions.</li>
+        </ul>
       </div>
     </section>
   );

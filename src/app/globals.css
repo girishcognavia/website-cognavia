@@ -27,7 +27,7 @@ a { color: inherit; text-decoration: none; }
   height: 100svh;
   min-height: 560px;
   overflow: hidden;
-  background: #030303;
+  background: #04060c;
 }
 
 .hero__canvas { position: absolute; inset: 0; }
@@ -67,45 +67,52 @@ html[data-hero-go] .hero [data-intro] {
 /* title block, top left */
 .hero__copy {
   position: absolute;
-  left: 13%;
-  top: 19%;
-  max-width: min(760px, 52vw);
+  left: 3.4%;
+  top: 14.2%;
+  max-width: min(900px, 50vw);
 }
 
 .hero__eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 1.35vw;
+  margin-left: -2.2vw;
   font-size: clamp(11px, 1vw, 20px);
-  font-weight: 400;
-  letter-spacing: 0.34em;
-  color: rgba(255, 255, 255, 0.82);
-  margin-bottom: clamp(10px, 1.4vw, 26px);
+  font-weight: 500;
+  letter-spacing: 0.3em;
+  color: rgba(226, 232, 245, 0.86);
+  margin-bottom: clamp(8px, 1.1vw, 22px);
 }
+/* the short rule leading into the eyebrow, from the screen's edge */
+.hero__eyebrow::before { content: ""; width: 4.6vw; height: 1px; background: rgba(226, 232, 245, 0.55); }
 
 .hero__title {
-  font-size: clamp(52px, 7vw, 150px);
+  font-size: clamp(52px, 7.6vw, 160px);
   font-weight: 700;
-  line-height: 0.95;
+  line-height: 1.02;
   letter-spacing: -0.02em;
-  color: #f4f4f4;
+  color: #f6f7fb;
   margin-left: -0.04em;
-  margin-bottom: clamp(18px, 2.4vw, 44px);
+  margin-bottom: clamp(14px, 1.9vw, 38px);
+  text-shadow: 0 0 1.4vw rgba(210, 222, 255, 0.28), 0 0 4vw rgba(150, 175, 255, 0.12);
 }
 
-.hero__title span { font-weight: 300; letter-spacing: 0; color: rgba(255, 255, 255, 0.86); }
+.hero__title span { font-weight: 400; letter-spacing: 0; color: #c3cdf6; text-shadow: 0 0 1.4vw rgba(160, 180, 255, 0.3); }
 
 .hero__sub {
-  max-width: 24em;
-  font-size: clamp(14px, 1.1vw, 22px);
+  max-width: 19em;
+  font-size: clamp(15px, 1.5vw, 30px);
   font-weight: 400;
-  line-height: 1.75;
-  letter-spacing: 0.12em;
-  color: rgba(255, 255, 255, 0.78);
+  line-height: 1.6;
+  letter-spacing: 0.005em;
+  color: rgba(236, 240, 250, 0.9);
 }
 
 /* Smarter Systems. A Brighter Tomorrow. — right */
 .hero__aside {
   position: absolute;
-  right: 4.8%;
-  top: 57%;
+  right: 5.6%;
+  top: 62.6%;
   display: flex;
   align-items: flex-start;
   gap: clamp(14px, 1.2vw, 22px);
@@ -125,8 +132,10 @@ html[data-hero-go] .hero [data-intro] {
 
 @media (max-width: 760px) {
   .hero__copy { left: 20px; right: 20px; top: 13%; max-width: none; }
+  .hero__eyebrow { margin-left: 0; gap: 10px; font-size: 10.5px; }
+  .hero__eyebrow::before { width: 24px; }
   .hero__title { font-size: 15vw; }
-  .hero__sub { font-size: 13px; letter-spacing: 0.08em; }
+  .hero__sub { font-size: 15px; }
   .hero__aside { display: none; }
 }
 
@@ -313,7 +322,7 @@ html[data-hero-go] .site-chrome .site-header { transform: none; opacity: 1; }
   position: relative;
   min-height: 100vh;
   min-height: 100svh;
-  background: #050505;
+  background: #08090d;
 }
 
 .about__inner {
@@ -324,13 +333,13 @@ html[data-hero-go] .site-chrome .site-header { transform: none; opacity: 1; }
   overflow: hidden;
 }
 
-/* the scene fills the right side and feathers into the page */
+/* the scene fills the right two-thirds and feathers into the page */
 .pioneering__canvas {
   position: absolute;
   top: 0;
   bottom: 0;
   right: 0;
-  width: 62%;
+  width: 70%;
   pointer-events: auto;
 }
 
@@ -340,117 +349,86 @@ html[data-hero-go] .site-chrome .site-header { transform: none; opacity: 1; }
   content: "";
   position: absolute;
   inset: 0 auto 0 0;
-  width: 24%;
-  background: linear-gradient(90deg, #050505, rgba(5, 5, 5, 0));
+  width: 14%;
+  background: linear-gradient(90deg, #08090d, rgba(8, 9, 13, 0));
   pointer-events: none;
 }
 
 .about__content {
   position: relative;
   z-index: 1;
-  margin-left: clamp(20px, 8.5vw, 170px);
-  max-width: min(640px, 42vw);
-  padding: 96px 0 64px;
+  margin-left: 5.75vw;
+  max-width: min(900px, 38vw);
+  padding: 96px 0 120px;
 }
 
 .about__eyebrow {
-  font-size: 12px;
+  font-size: clamp(11px, 0.78vw, 15px);
   font-weight: 500;
-  letter-spacing: 0.3em;
+  letter-spacing: 0.34em;
   text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.72);
-  margin-bottom: 18px;
+  color: rgba(226, 232, 245, 0.8);
+  margin-bottom: clamp(18px, 2vw, 40px);
 }
 
-.about__eyebrow span { margin: 0 0.9em; letter-spacing: 0; color: var(--ink-soft); }
+.about__eyebrow span { margin: 0 1.1em; letter-spacing: 0; color: rgba(226, 232, 245, 0.5); }
 
 .about__title {
-  font-size: clamp(36px, min(4.6vw, 8.5vh), 80px);
-  font-weight: 500;
-  line-height: 1.04;
+  font-size: clamp(38px, min(4.9vw, 9vh), 104px);
+  font-weight: 400;
+  line-height: 1.12;
   letter-spacing: -0.02em;
-  margin-bottom: 44px;
+  color: #eef1f8;
+  margin-bottom: clamp(26px, 3.3vw, 64px);
+  text-shadow: 0 0 1.4vw rgba(220, 228, 242, 0.14);
 }
 
 .about__title > span { display: block; }
+.about__title > span + span { font-weight: 700; color: #f6f8fc; }
 
 .about__ai {
-  background: linear-gradient(180deg, #ffffff 0%, #bdbdbd 45%, #5c5c5c 100%);
+  background: linear-gradient(180deg, #d3d8e0 0%, #a9b0bc 60%, #9198a5 100%);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
-  font-weight: 700;
+  text-shadow: none;
 }
 
 .about__body {
-  font-size: clamp(14px, 2.1vh, 16px);
+  font-size: clamp(14px, 1.06vw, 21px);
   font-weight: 400;
-  line-height: 1.8;
-  color: rgba(255, 255, 255, 0.72);
-  max-width: 34em;
-  margin-bottom: 26px;
+  line-height: 1.72;
+  color: rgba(230, 234, 244, 0.86);
+  max-width: 30.5vw;
+  margin-bottom: clamp(20px, 2.4vw, 46px);
 }
 
-.about__cta {
-  display: inline-flex;
-  align-items: center;
-  gap: 30px;
-  margin-top: 28px;
-  font-size: 11px;
-  font-weight: 500;
-  letter-spacing: 0.3em;
-  text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.8);
+.about__rule { display: block; width: 3.5vw; min-width: 44px; height: 2px; background: rgba(226, 232, 242, 0.8); box-shadow: 0 0 10px rgba(226, 232, 242, 0.35); margin-bottom: clamp(20px, 2.2vw, 42px); }
+
+.about__mission {
+  font-size: clamp(13px, 0.92vw, 18px);
+  font-weight: 400;
+  line-height: 1.78;
+  max-width: 30.5vw;
+  color: rgba(214, 220, 234, 0.72);
 }
-
-.about__cta-line { width: 64px; height: 1px; background: rgba(255, 255, 255, 0.5); }
-
-.about__cta-circle {
-  display: grid;
-  place-items: center;
-  width: 44px;
-  height: 44px;
-  border: 1px solid rgba(255, 255, 255, 0.6);
-  border-radius: 50%;
-  transition: background 0.3s ease, color 0.3s ease;
-}
-
-.about__cta:hover .about__cta-circle { background: #fff; color: #000; }
 
 .about__signature {
   position: absolute;
   z-index: 1;
-  right: clamp(20px, 5vw, 96px);
-  bottom: 8vh;
+  right: 5.4vw;
+  bottom: 6.5vh;
   display: flex;
-  align-items: flex-start;
-  gap: 22px;
-  font-size: 11px;
+  align-items: center;
+  gap: 1.6vw;
+  font-size: clamp(10px, 0.66vw, 13px);
   font-weight: 500;
-  line-height: 1.6;
-  letter-spacing: 0.28em;
+  letter-spacing: 0.3em;
   text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.7);
+  color: rgba(214, 220, 234, 0.75);
 }
 
-.about__signature-mark {
-  position: relative;
-  width: 64px;
-  height: 1px;
-  margin-top: 8px;
-  background: rgba(255, 255, 255, 0.45);
-}
-
-.about__signature-mark::before {
-  content: "";
-  position: absolute;
-  left: -8px;
-  top: -4px;
-  width: 7px;
-  height: 7px;
-  border: 1px solid rgba(255, 255, 255, 0.7);
-  border-radius: 50%;
-}
+.about__signature-mark { width: 3.5vw; min-width: 40px; height: 1px; background: rgba(226, 232, 242, 0.55); }
 
 /* ---------- Section 3: Products ---------- */
 /* One screen, composed on a 1780 × 1014 frame: copy and list on the left (cqw units), the
@@ -1793,14 +1771,13 @@ a.products__item { width: fit-content; text-decoration: none; }
 
   .about__inner { flex-direction: column; }
   .pioneering__canvas { position: relative; width: 100%; height: 52vh; }
-  .pioneering__canvas::after { inset: auto 0 0 0; width: auto; height: 20%; background: linear-gradient(rgba(5, 5, 5, 0), #050505); }
+  .pioneering__canvas::after { inset: auto 0 0 0; width: auto; height: 20%; background: linear-gradient(rgba(8, 9, 13, 0), #08090d); }
   .about__content { margin: 0 20px; max-width: none; padding: 0 0 72px; }
   .about__eyebrow { font-size: 9px; letter-spacing: 0.2em; margin-bottom: 12px; }
   .about__eyebrow span { margin: 0 0.5em; }
   .about__title { font-size: 38px; margin-bottom: 18px; }
-  .about__body { font-size: 13.5px; line-height: 1.65; margin-bottom: 12px; }
-  .about__body + .about__body { display: none; }
-  .about__cta { margin-top: 10px; }
+  .about__body { font-size: 14px; line-height: 1.65; margin-bottom: 18px; max-width: none; }
+  .about__mission { font-size: 13px; max-width: none; }
   .about__signature { display: none; }
 
   .products { min-height: 0; place-items: stretch; padding: 92px 20px 0; }

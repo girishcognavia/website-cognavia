@@ -71,8 +71,8 @@ export default function HeroScene() {
         eventSource={typeof document !== "undefined" ? document.documentElement : undefined}
         eventPrefix="client"
       >
-        <color attach="background" args={["#030303"]} />
-        <fog attach="fog" args={["#030303", 16, 34]} />
+        <color attach="background" args={["#04060c"]} />
+        <fog attach="fog" args={["#04060c", 16, 34]} />
         <ambientLight intensity={0.05} />
         <directionalLight position={[-5, 8, 7]} intensity={4.6} />
         <Environment resolution={256} frames={1}>
@@ -85,8 +85,8 @@ export default function HeroScene() {
         {/* stop once it is mostly scrolled away, so it never renders alongside the next scene for long */}
         <VisibilityLoop target={box} rootMargin="-18% 0px 0px 0px" />
         <EffectComposer multisampling={0}>
-          <Bloom mipmapBlur intensity={0.5} luminanceThreshold={0.72} luminanceSmoothing={0.2} />
-          <Noise premultiply opacity={0.14} />
+          <Bloom mipmapBlur intensity={0.55} luminanceThreshold={0.62} luminanceSmoothing={0.2} radius={0.62} />
+          <Noise premultiply opacity={0.08} />
           <Vignette offset={0.22} darkness={0.9} />
         </EffectComposer>
       </Canvas>

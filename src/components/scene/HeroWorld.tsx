@@ -2,14 +2,18 @@
 
 import { useMemo, useRef } from "react";
 import * as THREE from "three";
-import { useFrame, useThree } from "@react-three/fiber";
+import { useFrame, useLoader, useThree } from "@react-three/fiber";
 import { clamp01 } from "./shared";
+import HeroGalaxy from "./HeroGalaxy";
 
 /**
- * Hero: a quiet studio scene — dark glass panes receding into depth with light pouring
- * through a seam between them, a black sphere floating in front with a crescent of light on
- * its edge, a thin orbit with three points, and a polished floor. It lands with a slow,
- * staggered reveal; the title copy is HTML (Hero.tsx) and appears instantly.
+ * Hero: a night-side Earth floating between two tall glass slabs, a ringed galaxy of stars
+ * wrapped around it (its near side in front of the globe, its far side behind), and a dark
+ * polished floor that reflects the lit glass edges. Cool blue light with warm city lights.
+ * It lands with a slow, staggered reveal; the title copy is HTML (Hero.tsx).
+ *
+ * Positions are in world units for the reference framing (camera at z = CAM_Z, fov 35,
+ * ~1.85:1 screen); heroLayout() scales the whole group for other screen shapes.
  */
 
 export const CAM_Z = 14;
@@ -17,32 +21,23 @@ export const CAM_Z = 14;
 /** The hero's own landing clock (seconds since its scene became ready); driven by HeroScene. */
 export const heroClock = { t: 0 };
 
-/** Object name the Stage uses to prepare the hero (including its not-yet-revealed parts). */
+/** Object name the scene uses to prepare the hero (including its not-yet-revealed parts). */
 export const WARMUP_HERO = "warmup:hero";
 
-const FLOOR_Y = -2.75;
+const FLOOR_Y = -3.3;
+
+/** The globe: centre and radius (the galaxy is centred on it). */
+export const GLOBE = { pos: new THREE.Vector3(0.84, -0.72, 0), r: 1.58 };
 
 /** Scene placement per viewport shape (the copy sits top-left on desktop, top on phones). */
 export function heroLayout(aspect: number) {
-  return aspect < 1
-    ? { pos: new THREE.Vector3(-1.05, -0.35, 0), scale: 0.5 }
-    : // on screens narrower than the reference (≈2:1), shrink a little so the far pane
-      // stays clear of the "Smarter Systems" line on the right
-      { pos: new THREE.Vector3(0, -0.25 * (1 - Math.min(1, 0.4 + aspect * 0.29)), 0), scale: Math.min(1, 0.4 + aspect * 0.29) };
+  if (aspect < 1) return { pos: new THREE.Vector3(-0.55, -1.0, 0), scale: 0.52 };
+  // the reference framing is ~1.85:1; narrower screens shrink the scene to keep it whole
+  const k = Math.min(1, aspect / 1.85);
+  return { pos: new THREE.Vector3(0.35 * (1 - k), -0.3 * (1 - k), 0), scale: k };
 }
 
-/** The hero's accent light, beside the light seam (hero-local; placed by Stage's WorldLights). */
-export const HERO_LIGHT: [number, number, number] = [3.4, -0.4, 0.6];
-
-/** The floating sphere; depth of field focuses here. */
-export const HERO_FOCUS = new THREE.Vector3(1.75, -1.1, 0.6);
-const SPHERE_R = 0.9;
-
 const ease = (x: number) => 1 - Math.pow(1 - clamp01(x), 3); // ease-out cubic
-const easeInOut = (x: number) => {
-  x = clamp01(x);
-  return x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
-};
 
 /* ------------------------------------------------------------------ */
 /* Textures                                                            */
@@ -68,112 +63,109 @@ const radial = () =>
     ctx.fillRect(0, 0, 256, 256);
   });
 
-/** Light on a pane: brightest along one vertical edge, fading across the glass. */
+/** Light spreading across a slab from one vertical edge. */
 const paneLight = (fromRight: boolean) =>
   canvasTex(256, 16, (ctx) => {
     const g = ctx.createLinearGradient(fromRight ? 256 : 0, 0, fromRight ? 0 : 256, 0);
-    g.addColorStop(0, "rgba(255,255,255,0.95)");
-    g.addColorStop(0.12, "rgba(255,255,255,0.4)");
-    g.addColorStop(0.55, "rgba(255,255,255,0.07)");
+    g.addColorStop(0, "rgba(255,255,255,0.9)");
+    g.addColorStop(0.1, "rgba(255,255,255,0.32)");
+    g.addColorStop(0.5, "rgba(255,255,255,0.06)");
     g.addColorStop(1, "rgba(255,255,255,0)");
     ctx.fillStyle = g;
     ctx.fillRect(0, 0, 256, 16);
   });
 
 /** A vertical streak (floor reflections): soft sides, bright at the top, fading down. */
-const streak = () => {
-  const W = 64, H = 256;
-  const c = document.createElement("canvas");
-  c.width = W;
-  c.height = H;
-  const ctx = c.getContext("2d")!;
-  const img = ctx.createImageData(W, H);
-  for (let y = 0; y < H; y++) {
-    const v = Math.pow(1 - y / H, 2.2) * Math.min(1, y / (H * 0.06)); // soft start at the floor line, fading away from it
-    for (let x = 0; x < W; x++) {
-      const dx = (x - W / 2) / (W / 2);
-      const a = Math.exp(-dx * dx * 5) * v; // soft gaussian sides
-      const i = (y * W + x) * 4;
-      img.data[i] = img.data[i + 1] = img.data[i + 2] = 255;
-      img.data[i + 3] = Math.round(a * 255);
+const streak = () =>
+  canvasTex(64, 256, (ctx) => {
+    const img = ctx.createImageData(64, 256);
+    for (let y = 0; y < 256; y++) {
+      const v = Math.pow(1 - y / 256, 2) * Math.min(1, y / 14);
+      for (let x = 0; x < 64; x++) {
+        const dx = (x - 32) / 32;
+        const i = (y * 64 + x) * 4;
+        img.data[i] = img.data[i + 1] = img.data[i + 2] = 255;
+        img.data[i + 3] = Math.round(Math.exp(-dx * dx * 6) * v * 255);
+      }
     }
-  }
-  ctx.putImageData(img, 0, 0);
-  const t = new THREE.CanvasTexture(c);
-  t.colorSpace = THREE.SRGBColorSpace;
-  return t;
-};
+    ctx.putImageData(img, 0, 0);
+  });
+
+/** A thin bright ring (the light on the floor beneath the globe). */
+const ringTex = () =>
+  canvasTex(512, 512, (ctx) => {
+    const g = ctx.createRadialGradient(256, 256, 0, 256, 256, 256);
+    g.addColorStop(0, "rgba(255,255,255,0.10)");
+    g.addColorStop(0.78, "rgba(255,255,255,0.04)");
+    g.addColorStop(0.9, "rgba(255,255,255,0.9)");
+    g.addColorStop(0.93, "rgba(255,255,255,0.25)");
+    g.addColorStop(1, "rgba(255,255,255,0)");
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, 512, 512);
+  });
 
 /* ------------------------------------------------------------------ */
-/* Panes                                                               */
+/* Glass slabs                                                         */
 /* ------------------------------------------------------------------ */
 
-type Pane = {
+type Slab = {
   x: number;
   z: number;
   w: number;
   h: number;
-  d: number; // thickness
   rotY: number;
-  edge: [number, number]; // left / right edge brightness
-  light?: "left" | "right"; // light spreading across the glass from that edge
+  /** brightness of the left / right edge light */
+  edge: [number, number];
+  light?: "left" | "right";
   lightStrength?: number;
   delay: number;
 };
 
-// front block, main pane, narrow inner pane, far pane
-const PANES: Pane[] = [
-  { x: -0.3, z: 0.7, w: 1.8, h: 3.05, d: 0.06, rotY: -0.42, edge: [0.3, 0.9], light: "right", lightStrength: 0.18, delay: 0.3 },
-  { x: 2.25, z: -0.35, w: 2.35, h: 5.95, d: 0.04, rotY: -0.55, edge: [0.35, 4.5], light: "right", lightStrength: 0.7, delay: 0.15 },
-  { x: 3.55, z: -0.75, w: 0.5, h: 4.3, d: 0.04, rotY: -0.55, edge: [1.4, 0.6], light: "left", lightStrength: 0.35, delay: 0.45 },
-  { x: 4.35, z: -1.1, w: 2.05, h: 6.3, d: 0.04, rotY: -0.62, edge: [0.8, 0.9], light: "left", lightStrength: 0.22, delay: 0.3 },
+const EDGE_COLOR = new THREE.Color("#cfe0ff");
+
+// left: a slab with a second, thinner one just behind it; right: a tall slab in two panels
+const SLABS: Slab[] = [
+  { x: -1.88, z: 0.6, w: 1.18, h: 4.55, rotY: -0.18, edge: [0.25, 2.6], light: "right", lightStrength: 0.1, delay: 0.25 },
+  { x: -1.32, z: 0.2, w: 0.3, h: 4.4, rotY: -0.18, edge: [0.1, 0.5], delay: 0.35 },
+  { x: 2.45, z: -0.45, w: 1.0, h: 6.0, rotY: -0.22, edge: [0.35, 0.3], light: "right", lightStrength: 0.12, delay: 0.15 },
+  { x: 3.82, z: -0.2, w: 1.72, h: 6.35, rotY: -0.22, edge: [3.2, 2.4], light: "left", lightStrength: 0.2, delay: 0.1 },
 ];
 
-function PaneMesh({ p, glass, light }: { p: Pane; glass: THREE.Material; light: THREE.Texture | null }) {
+function SlabMesh({ s, glass, light }: { s: Slab; glass: THREE.Material; light: THREE.Texture | null }) {
   const group = useRef<THREE.Group>(null);
   const edges = useRef<(THREE.MeshBasicMaterial | null)[]>([]);
   const lightMat = useRef<THREE.MeshBasicMaterial>(null);
+  const d = 0.04;
   useFrame(() => {
-    const e = ease((heroClock.t - p.delay) / 1.4);
+    const e = ease((heroClock.t - s.delay) / 1.4);
     if (group.current) {
-      group.current.position.y = FLOOR_Y + p.h / 2 - (1 - e) * 0.6;
+      group.current.position.y = FLOOR_Y + s.h / 2 - (1 - e) * 0.6;
       group.current.visible = e > 0.001;
     }
-    edges.current.forEach((m, i) => {
-      if (m) m.color.setScalar((i < 2 ? p.edge[i] : 0.35) * e);
-    });
-    if (lightMat.current) lightMat.current.opacity = (p.lightStrength ?? 0) * e;
+    edges.current.forEach((m, i) => m && m.color.copy(EDGE_COLOR).multiplyScalar((i < 2 ? s.edge[i] : 0.3) * e));
+    if (lightMat.current) lightMat.current.opacity = (s.lightStrength ?? 0) * e;
   });
-  const { w, h, d } = p;
+  const { w, h } = s;
   return (
-    <group ref={group} position={[p.x, FLOOR_Y + h / 2, p.z]} rotation={[0, p.rotY, 0]} visible={false}>
+    <group ref={group} position={[s.x, FLOOR_Y + h / 2, s.z]} rotation={[0, s.rotY, 0]} visible={false}>
       <mesh material={glass}>
         <boxGeometry args={[w, h, d]} />
       </mesh>
       {light && (
         <mesh position={[0, 0, d / 2 + 0.004]}>
           <planeGeometry args={[w, h]} />
-          <meshBasicMaterial
-            ref={lightMat}
-            map={light}
-            transparent
-            opacity={0}
-            depthWrite={false}
-            blending={THREE.AdditiveBlending}
-            toneMapped={false}
-          />
+          <meshBasicMaterial ref={lightMat} map={light} color="#bcd2ff" transparent opacity={0} depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} />
         </mesh>
       )}
-      {/* thin light along the left and right edges, and a faint top edge */}
       {(
         [
-          [[-w / 2, 0, d / 2], [0.01, h, 0.01]],
-          [[w / 2, 0, d / 2], [0.022, h, 0.022]],
-          [[0, h / 2, d / 2], [w, 0.006, 0.006]],
+          [[-w / 2, 0, d / 2], [0.016, h, 0.016]],
+          [[w / 2, 0, d / 2], [0.024, h, 0.024]],
+          [[0, h / 2, d / 2], [w, 0.008, 0.008]],
         ] as [number, number, number][][]
-      ).map(([pos, s], i) => (
+      ).map(([pos, sz], i) => (
         <mesh key={i} position={pos}>
-          <boxGeometry args={s} />
+          <boxGeometry args={sz} />
           <meshBasicMaterial
             ref={(m) => {
               edges.current[i] = m;
@@ -187,12 +179,97 @@ function PaneMesh({ p, glass, light }: { p: Pane; glass: THREE.Material; light: 
   );
 }
 
+const EARTH = ["/textures/earth-day.jpg", "/textures/earth-lights.jpg", "/textures/earth-water.jpg"];
+// start fetching the Earth textures as soon as the 3D code loads
+if (typeof window !== "undefined") useLoader.preload(THREE.TextureLoader, EARTH);
+
 /* ------------------------------------------------------------------ */
-/* Sphere                                                              */
+/* Globe: the night side of the Earth                                  */
 /* ------------------------------------------------------------------ */
 
-function Sphere() {
+function Globe({ halo }: { halo: THREE.Texture }) {
   const group = useRef<THREE.Group>(null);
+  const backGlow = useRef<THREE.SpriteMaterial>(null);
+  const spin = useRef<THREE.Group>(null);
+  const [day, lights, water] = useLoader(THREE.TextureLoader, EARTH);
+  const mat = useMemo(() => {
+    [day, lights, water].forEach((t) => {
+      t.anisotropy = 4;
+    });
+    return new THREE.ShaderMaterial({
+      uniforms: { uDay: { value: day }, uLights: { value: lights }, uWater: { value: water }, uReveal: { value: 0 } },
+      vertexShader: /* glsl */ `
+        varying vec2 vUv; varying vec3 vN; varying vec3 vV;
+        void main() {
+          vUv = uv;
+          vec4 mv = modelViewMatrix * vec4(position, 1.0);
+          vN = normalize(normalMatrix * normal);
+          vV = normalize(-mv.xyz);
+          gl_Position = projectionMatrix * mv;
+        }`,
+      fragmentShader: /* glsl */ `
+        uniform sampler2D uDay, uLights, uWater; uniform float uReveal;
+        varying vec2 vUv; varying vec3 vN; varying vec3 vV;
+        void main() {
+          vec3 n = normalize(vN);
+          float facing = clamp(dot(n, normalize(vV)), 0.0, 1.0);
+          float land = 1.0 - texture2D(uWater, vUv).r;          // 1 on land, 0 on water
+          float relief = texture2D(uDay, vUv).r;
+          // moonlit side: navy oceans, slate-blue continents
+          // values are linear: kept very low so the night side reads deep navy on screen
+          vec3 ocean = vec3(0.0007, 0.0013, 0.004);
+          vec3 ground = mix(vec3(0.0025, 0.004, 0.0085), vec3(0.008, 0.012, 0.022), relief);
+          vec3 col = mix(ocean, ground, land);
+          // soft key light from the upper left, where the atmosphere glows
+          float key = clamp(dot(n, normalize(vec3(-0.55, 0.65, 0.5))), 0.0, 1.0);
+          col *= 0.45 + 1.3 * key;
+          // city lights: warm orange-gold, brightest in the dense clusters
+          float city = texture2D(uLights, vUv).r;
+          col += vec3(1.0, 0.5, 0.16) * pow(city, 2.2) * 1.3 * land;
+          // ocean sheen toward the light
+          col += vec3(0.1, 0.18, 0.4) * pow(key, 14.0) * (1.0 - land) * 0.25;
+          // atmosphere: a blue limb, strongest on the lit upper-left edge
+          float fres = pow(1.0 - facing, 6.5);
+          float lit = 0.25 + 1.0 * smoothstep(-0.3, 0.9, dot(n.xy, normalize(vec2(-0.6, 0.8))));
+          col += vec3(0.3, 0.52, 1.0) * fres * lit * 2.6;
+          gl_FragColor = vec4(col * uReveal, 1.0);
+        }`,
+    });
+  }, [day, lights, water]);
+
+  useFrame((state, dt) => {
+    const e = ease((heroClock.t - 0.45) / 1.7);
+    if (group.current) {
+      group.current.visible = e > 0.001;
+      group.current.scale.setScalar(0.94 + 0.06 * e);
+      group.current.position.y = GLOBE.pos.y - (1 - e) * 0.3 + Math.sin(state.clock.elapsedTime * 0.55) * 0.03 * e;
+    }
+    // turns slowly, Asia and the Indian Ocean facing the viewer as in the reference
+    if (spin.current) spin.current.rotation.y += Math.min(dt, 1 / 30) * 0.012;
+    mat.uniforms.uReveal.value = e;
+    if (backGlow.current) backGlow.current.opacity = 0.06 * e;
+  });
+
+  return (
+    <group ref={group} position={GLOBE.pos} visible={false}>
+      <group rotation={[0.38, 0, 0.12]}>
+        <group ref={spin} rotation={[0, -3.45, 0]}>
+          <mesh material={mat}>
+            <sphereGeometry args={[GLOBE.r, 96, 96]} />
+          </mesh>
+        </group>
+      </group>
+      <Atmosphere />
+      {/* a wide, faint blue glow behind the globe */}
+      <sprite position={[0, 0, -1.2]} scale={7.5} renderOrder={-1}>
+        <spriteMaterial ref={backGlow} map={halo} color="#5f86ff" transparent opacity={0} depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} />
+      </sprite>
+    </group>
+  );
+}
+
+/** The soft blue glow around the globe (a back-facing shell, additive). */
+function Atmosphere() {
   const mat = useMemo(
     () =>
       new THREE.ShaderMaterial({
@@ -208,127 +285,25 @@ function Sphere() {
         fragmentShader: /* glsl */ `
           uniform float uReveal; varying vec3 vN; varying vec3 vV;
           void main() {
-            vec3 n = normalize(vN);
-            float facing = clamp(dot(n, normalize(vV)), 0.0, 1.0);
-            float fres = pow(1.0 - facing, 4.0);
-            // lit from the right-hand light seam: a crisp crescent on that edge, a whisper elsewhere
-            float side = smoothstep(0.0, 0.95, dot(n.xy, normalize(vec2(1.0, 0.3))));
-            float crescent = fres * (0.03 + 2.8 * side);
-            // very soft body shading so it reads as a sphere, not a flat disc
-            float body = 0.006 + 0.03 * pow(clamp(dot(n, normalize(vec3(0.7, 0.45, 0.55))), 0.0, 1.0), 3.0);
-            gl_FragColor = vec4(vec3(body + crescent) * uReveal, 1.0);
+            float f = clamp(dot(normalize(vN), normalize(vV)), 0.0, 1.0);
+            float a = pow(f, 2.6);
+            float lit = 0.55 + 0.45 * smoothstep(-0.4, 0.9, dot(normalize(vN).xy, normalize(vec2(-0.6, 0.8))));
+            gl_FragColor = vec4(vec3(0.35, 0.58, 1.0) * a * lit * 0.9 * uReveal, 1.0);
           }`,
+        side: THREE.BackSide,
+        transparent: true,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
       }),
     [],
   );
-  useFrame((state) => {
-    const e = ease((heroClock.t - 0.55) / 1.6);
-    if (group.current) {
-      group.current.visible = e > 0.001;
-      group.current.scale.setScalar(0.92 + 0.08 * e);
-      // floats: rises into place, then breathes very slightly
-      group.current.position.y = HERO_FOCUS.y - (1 - e) * 0.35 + Math.sin(state.clock.elapsedTime * 0.6) * 0.03 * e;
-    }
-    mat.uniforms.uReveal.value = e;
-  });
-  return (
-    <group ref={group} position={HERO_FOCUS} visible={false}>
-      <mesh material={mat}>
-        <sphereGeometry args={[SPHERE_R, 96, 96]} />
-      </mesh>
-    </group>
-  );
-}
-
-/* ------------------------------------------------------------------ */
-/* Orbit                                                               */
-/* ------------------------------------------------------------------ */
-
-const ORBIT = { cx: 1.2, cy: -0.45, rx: 5.55, ry: 1.02, tilt: 0.19, z: 0.2 };
-const DOTS = [3.66, 4.05, 0.45]; // angles: two lower-left, one upper-right
-
-function Orbit({ halo }: { halo: THREE.Texture }) {
-  const group = useRef<THREE.Group>(null);
-  const lineMat = useRef<THREE.LineBasicMaterial>(null);
-  const dots = useRef<(THREE.Group | null)[]>([]);
-  const geo = useMemo(
-    () =>
-      new THREE.BufferGeometry().setFromPoints(
-        new THREE.EllipseCurve(0, 0, ORBIT.rx, ORBIT.ry, 0, Math.PI * 2, false, 0).getPoints(320).map((v) => new THREE.Vector3(v.x, v.y, 0)),
-      ),
-    [],
-  );
-  useFrame((state) => {
-    const t = state.clock.elapsedTime;
-    const e = easeInOut((heroClock.t - 0.9) / 1.8);
-    if (group.current) {
-      group.current.visible = e > 0.001;
-      group.current.scale.set(0.9 + 0.1 * e, 0.9 + 0.1 * e, 1);
-    }
-    if (lineMat.current) lineMat.current.opacity = 0.5 * e;
-    dots.current.forEach((d, i) => {
-      if (!d) return;
-      const a = DOTS[i] + t * 0.03;
-      d.position.set(Math.cos(a) * ORBIT.rx, Math.sin(a) * ORBIT.ry, 0.01);
-      d.scale.setScalar(Math.max(0.001, ease((heroClock.t - 1.5 - i * 0.15) / 0.8)));
-    });
-  });
-  return (
-    <group position={[ORBIT.cx, ORBIT.cy, ORBIT.z]} rotation={[0, 0, ORBIT.tilt]}>
-      <group ref={group} visible={false}>
-        <line>
-          <primitive object={geo} attach="geometry" />
-          <lineBasicMaterial ref={lineMat} color="#ffffff" transparent opacity={0} depthWrite={false} />
-        </line>
-        {DOTS.map((_, i) => (
-          <group
-            key={i}
-            ref={(g) => {
-              dots.current[i] = g;
-            }}
-          >
-            <mesh>
-              <sphereGeometry args={[0.05, 16, 16]} />
-              <meshBasicMaterial color={[2.6, 2.6, 2.6]} toneMapped={false} />
-            </mesh>
-            <sprite scale={0.34}>
-              <spriteMaterial map={halo} transparent opacity={0.5} depthWrite={false} blending={THREE.AdditiveBlending} />
-            </sprite>
-          </group>
-        ))}
-      </group>
-    </group>
-  );
-}
-
-/* ------------------------------------------------------------------ */
-/* Light: the seam between the panes, and where it meets the orbit      */
-/* ------------------------------------------------------------------ */
-
-function Seam({ halo }: { halo: THREE.Texture }) {
-  const glow = useRef<THREE.MeshBasicMaterial>(null);
-  const spark = useRef<THREE.SpriteMaterial>(null);
-  // the main pane's right edge, in the scene
-  const main = PANES[1];
-  const edge = new THREE.Vector3(main.w / 2, 0, 0).applyEuler(new THREE.Euler(0, main.rotY, 0)).add(new THREE.Vector3(main.x, 0, main.z));
   useFrame(() => {
-    const e = ease((heroClock.t - 0.4) / 1.6);
-    if (glow.current) glow.current.opacity = 0.2 * e;
-    if (spark.current) spark.current.opacity = 0.9 * ease((heroClock.t - 1.6) / 0.8);
+    mat.uniforms.uReveal.value = ease((heroClock.t - 0.6) / 1.8);
   });
   return (
-    <>
-      <group position={[edge.x + 0.03, FLOOR_Y, edge.z + 0.02]}>
-        <mesh position={[-0.3, main.h / 2, -0.1]} scale={[2.6, main.h * 1.1, 1]}>
-          <planeGeometry />
-          <meshBasicMaterial ref={glow} map={halo} transparent opacity={0} depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} />
-        </mesh>
-      </group>
-      {/* the bright point where the orbit passes the inner pane */}
-      <sprite position={[3.8, 0.98, -0.5]} scale={0.42}>
-        <spriteMaterial ref={spark} map={halo} transparent opacity={0} depthWrite={false} blending={THREE.AdditiveBlending} />
-      </sprite>
-    </>
+    <mesh material={mat} scale={1.16}>
+      <sphereGeometry args={[GLOBE.r, 64, 64]} />
+    </mesh>
   );
 }
 
@@ -336,34 +311,31 @@ function Seam({ halo }: { halo: THREE.Texture }) {
 /* Floor                                                               */
 /* ------------------------------------------------------------------ */
 
-function Floor({ halo, streakTex }: { halo: THREE.Texture; streakTex: THREE.Texture }) {
+function Floor({ halo, streakTex, ring }: { halo: THREE.Texture; streakTex: THREE.Texture; ring: THREE.Texture }) {
   const base = useRef<THREE.MeshBasicMaterial>(null);
-  const pool = useRef<THREE.MeshBasicMaterial>(null);
   const sheen = useRef<THREE.MeshBasicMaterial>(null);
+  const pool = useRef<THREE.MeshBasicMaterial>(null);
+  const ringMat = useRef<THREE.MeshBasicMaterial>(null);
   const streaks = useRef<(THREE.MeshBasicMaterial | null)[]>([]);
-  // a polished floor: a soft horizon sheen, a pool of light under the panes, and
-  // vertical reflections of the lit edges (painted, not a mirror pass — that redraws the
-  // whole scene every frame)
   const sheenTex = useMemo(
     () =>
       canvasTex(16, 256, (ctx) => {
         const g = ctx.createLinearGradient(0, 0, 0, 256);
         g.addColorStop(0, "rgba(255,255,255,0)");
-        g.addColorStop(0.08, "rgba(255,255,255,0.55)");
-        g.addColorStop(0.35, "rgba(255,255,255,0.14)");
-        g.addColorStop(1, "rgba(255,255,255,0.05)");
+        g.addColorStop(0.06, "rgba(255,255,255,0.6)");
+        g.addColorStop(0.3, "rgba(255,255,255,0.12)");
+        g.addColorStop(1, "rgba(255,255,255,0.04)");
         ctx.fillStyle = g;
         ctx.fillRect(0, 0, 16, 256);
       }),
     [],
   );
-  // floor opacity: solid near the viewer, fading out over the last stretch to the far edge
   const fade = useMemo(() => {
     const c = document.createElement("canvas");
     c.width = 4;
     c.height = 256;
     const ctx = c.getContext("2d")!;
-    const g = ctx.createLinearGradient(0, 0, 0, 256); // top of the texture = far edge
+    const g = ctx.createLinearGradient(0, 0, 0, 256);
     g.addColorStop(0, "#000");
     g.addColorStop(0.1, "#fff");
     g.addColorStop(1, "#fff");
@@ -371,41 +343,47 @@ function Floor({ halo, streakTex }: { halo: THREE.Texture; streakTex: THREE.Text
     ctx.fillRect(0, 0, 4, 256);
     return new THREE.CanvasTexture(c);
   }, []);
-  const REFL: [number, number, number][] = [
-    [3.02, 0.9, 2.6], // the light seam (over-bright: it's the strongest reflection)
-    [3.6, 0.5, 0.5],
-    [0.6, 0.5, 0.4], // front block's lit edge
-    [1.8, 1.1, 0.2],
+  // reflections straight down from the foot of each lit slab edge: [x, z, width, brightness, warmth]
+  const REFL: [number, number, number, number, number][] = [
+    [4.66, -0.39, 0.34, 2.2, 0.7], // tall slab, right edge (warm, as in the reference)
+    [2.97, -0.01, 0.36, 2.0, 0], // tall slab, inner edge
+    [-1.3, 0.49, 0.3, 1.7, 0], // left slab's lit edge
+    [0.84, 0.3, 1.6, 0.3, 0], // the globe's glow
   ];
   useFrame(() => {
     const e = ease(heroClock.t / 1.6);
     const l = ease((heroClock.t - 0.5) / 1.8);
     if (base.current) base.current.opacity = e;
-    if (sheen.current) sheen.current.opacity = 0.085 * e;
-    if (pool.current) pool.current.opacity = 0.32 * l;
+    if (sheen.current) sheen.current.opacity = 0.06 * e;
+    if (pool.current) pool.current.opacity = 0.12 * l;
+    if (ringMat.current) ringMat.current.opacity = 0.05 * l;
     streaks.current.forEach((m, i) => {
-      if (m) m.color.setScalar(REFL[i][2] * l);
+      if (!m) return;
+      const [, , , b, warm] = REFL[i];
+      m.color.setRGB(0.72 + 0.28 * warm, 0.82 + 0.06 * warm, 1.0 - 0.3 * warm).multiplyScalar(b * l);
     });
   });
   return (
     <group position={[0, FLOOR_Y, 0]}>
-      {/* the floor ends just behind the panes, like a stage: above it is the dark studio */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[1, 0, 15.5]} renderOrder={-2}>
         <planeGeometry args={[60, 34]} />
-        <meshBasicMaterial ref={base} color="#0d0d0e" alphaMap={fade} transparent opacity={0} depthWrite={false} />
+        <meshBasicMaterial ref={base} color="#040609" alphaMap={fade} transparent opacity={0} depthWrite={false} />
       </mesh>
-      {/* sheen: brightest along the far edge, fading toward the viewer */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[-2, 0.02, 6.5]} scale={[40, 16, 1]} renderOrder={-1}>
         <planeGeometry />
-        <meshBasicMaterial ref={sheen} map={sheenTex} transparent opacity={0} depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} />
+        <meshBasicMaterial ref={sheen} map={sheenTex} color="#9db8ff" transparent opacity={0} depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} />
       </mesh>
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[2.6, 0.04, 0.6]} scale={[7, 3.4, 1]} renderOrder={-1}>
+      {/* a soft pool of blue light under the globe, and the thin bright ring on the floor */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[GLOBE.pos.x, 0.03, 0.2]} scale={[7.5, 3.2, 1]} renderOrder={-1}>
         <planeGeometry />
-        <meshBasicMaterial ref={pool} map={halo} transparent opacity={0} depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} />
+        <meshBasicMaterial ref={pool} map={halo} color="#7fa2ff" transparent opacity={0} depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} />
       </mesh>
-      {/* reflections: straight down beneath each lit edge, as on polished stone */}
-      {REFL.map(([x, w], i) => (
-        <mesh key={i} position={[x, -1.3, 1.2]} scale={[w, 2.6, 1]} renderOrder={5}>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[GLOBE.pos.x, 0.04, 0.2]} scale={[4.6, 4.6, 1]} renderOrder={-1}>
+        <planeGeometry />
+        <meshBasicMaterial ref={ringMat} map={ring} color="#cfe0ff" transparent opacity={0} depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} />
+      </mesh>
+      {REFL.map(([x, z, w], i) => (
+        <mesh key={i} position={[x, -1.25, z + 0.05]} scale={[w, 2.5, 1]} renderOrder={5}>
           <planeGeometry />
           <meshBasicMaterial
             ref={(m) => {
@@ -430,20 +408,19 @@ function Floor({ halo, streakTex }: { halo: THREE.Texture; streakTex: THREE.Text
 export default function HeroWorld() {
   const size = useThree((s) => s.size);
   const layout = useMemo(() => heroLayout(size.width / size.height), [size]);
-  const group = useRef<THREE.Group>(null);
 
-  // clear, very dark glass: the edges and the light carry the shape
+  // clear glass with a faint cool tint: the edges and the light carry the shape
   const glass = useMemo(
     () =>
       new THREE.MeshPhysicalMaterial({
-        color: "#0a0a0b",
-        metalness: 0.2,
-        roughness: 0.05,
+        color: "#0b1220",
+        metalness: 0.15,
+        roughness: 0.06,
         clearcoat: 1,
         clearcoatRoughness: 0.04,
-        envMapIntensity: 0.55,
+        envMapIntensity: 0.6,
         transparent: true,
-        opacity: 0.55,
+        opacity: 0.3,
         depthWrite: false,
         side: THREE.DoubleSide,
       }),
@@ -451,19 +428,17 @@ export default function HeroWorld() {
   );
   const halo = useMemo(() => radial(), []);
   const streakTex = useMemo(() => streak(), []);
+  const ring = useMemo(() => ringTex(), []);
   const lights = useMemo(() => ({ left: paneLight(false), right: paneLight(true) }), []);
 
   return (
-    <group ref={group} name={WARMUP_HERO} position={layout.pos} scale={layout.scale}>
-      <Floor halo={halo} streakTex={streakTex} />
-      <Seam halo={halo} />
-      {PANES.map((p, i) => (
-        <PaneMesh key={i} p={p} glass={glass} light={p.light ? lights[p.light] : null} />
+    <group name={WARMUP_HERO} position={layout.pos} scale={layout.scale}>
+      <Floor halo={halo} streakTex={streakTex} ring={ring} />
+      {SLABS.map((s, i) => (
+        <SlabMesh key={i} s={s} glass={glass} light={s.light ? lights[s.light] : null} />
       ))}
-      <Sphere />
-      <Orbit halo={halo} />
-      {/* its accent light lives in Stage's always-on WorldLights: a light that disappears
-          with the hero would change the light count and force every shader to recompile */}
+      <Globe halo={halo} />
+      <HeroGalaxy clock={heroClock} />
     </group>
   );
 }

@@ -1,663 +1,562 @@
 "use client";
 
-import { type ComponentRef, useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
-import { Canvas, useFrame, useThree, type ThreeEvent } from "@react-three/fiber";
-import { Environment, Lightformer, Line, MeshReflectorMaterial, RoundedBox } from "@react-three/drei";
+import { Canvas, useFrame, useThree } from "@react-three/fiber";
+import { Environment, Lightformer } from "@react-three/drei";
 import { Bloom, EffectComposer, Vignette } from "@react-three/postprocessing";
-import type { Line2, LineSegments2 } from "three-stdlib";
+import Prepare from "./Prepare";
 import VisibilityLoop from "./VisibilityLoop";
 
 /**
- * Pioneering section: an isometric "AI" cube of real refractive glass on a machined platform,
- * wired to frosted-glass tiles for the things AI connects (knowledge, documents, cloud,
- * people, insight). Light pulses travel along circuit traces into the cube, whose core lights
- * the platform and is mirrored in a polished floor.
- *
- * It lands when the section scrolls into view; the scene leans toward the pointer, and
- * hovering a tile lifts it and speeds up its pulses. This canvas renders only while on screen.
+ * Section 2 ("Pioneering the Future of AI"): a glass cube with a glowing AI chip inside,
+ * standing on a stepped platform, ringed by orbits of light and four floating glass cards
+ * (AI Agents, Cloud & Infrastructure, Custom Solutions, Data & Analytics), over a dark
+ * polished floor. Cool silver-white light on charcoal, matching the rest of the site. Lands once when the section
+ * comes into view, then floats gently; renders only while on screen.
  */
 
-const clamp01 = (x: number) => Math.min(Math.max(x, 0), 1);
-const ease = (x: number) => 1 - Math.pow(1 - clamp01(x), 3);
-
-/** Landing clock: starts the first time the section is on screen. */
 const clock = { t: 0, running: false };
+const ease = (x: number) => 1 - Math.pow(1 - Math.min(Math.max(x, 0), 1), 3);
+const smooth = (x: number) => {
+  x = Math.min(Math.max(x, 0), 1);
+  return x * x * (3 - 2 * x);
+};
 
-// isometric axes as seen by the camera: screen-right, toward-the-viewer, up
-const RIGHT = new THREE.Vector3(1, 0, -1).normalize();
-const FRONT = new THREE.Vector3(1, 0, 1).normalize();
-const at = (r: number, up: number, f: number) =>
-  new THREE.Vector3().addScaledVector(RIGHT, r).addScaledVector(FRONT, f).setY(up);
+// the site palette: cool silver-white light on dark charcoal (as in Products and Leadership)
+const BLUE = new THREE.Color("#dfe6f2");
+const FLOOR_Y = -1.53; // platform top (FLOOR_Y + 0.48) meets the cube's base
+const CUBE = 2.05;
+const CUBE_POS = new THREE.Vector3(0.8, -0.02, 0);
+const CUBE_ROT = Math.PI / 4;
 
 /* ------------------------------------------------------------------ */
 /* Textures                                                            */
 /* ------------------------------------------------------------------ */
 
-type IconName = "brain" | "document" | "cloud" | "people" | "chart";
-
-/** White line icon on a transparent background (it glows inside the glass tile). */
-function iconTexture(name: IconName) {
-  const S = 256;
-  const c = document.createElement("canvas");
-  c.width = c.height = S;
-  const ctx = c.getContext("2d")!;
-  ctx.strokeStyle = "#fff";
-  ctx.lineWidth = 8;
-  ctx.lineCap = "round";
-  ctx.lineJoin = "round";
-  ctx.translate(S / 2, S / 2);
-  ctx.beginPath();
-  if (name === "document") {
-    ctx.moveTo(-40, -60);
-    ctx.lineTo(18, -60);
-    ctx.lineTo(44, -34);
-    ctx.lineTo(44, 62);
-    ctx.lineTo(-40, 62);
-    ctx.closePath();
-    ctx.moveTo(18, -60);
-    ctx.lineTo(18, -34);
-    ctx.lineTo(44, -34);
-    for (const y of [-12, 10, 32]) {
-      ctx.moveTo(-22, y);
-      ctx.lineTo(26, y);
-    }
-  } else if (name === "cloud") {
-    ctx.moveTo(-50, 30);
-    ctx.arc(-38, 8, 24, Math.PI * 0.6, Math.PI * 1.5);
-    ctx.arc(-4, -18, 34, Math.PI * 1.1, Math.PI * 1.9);
-    ctx.arc(36, 6, 26, Math.PI * 1.45, Math.PI * 0.4);
-    ctx.closePath();
-  } else if (name === "people") {
-    for (const [x, s] of [[-22, 1], [26, 0.85]] as const) {
-      ctx.moveTo(x + 18 * s, -30 * s);
-      ctx.arc(x, -30 * s, 18 * s, 0, Math.PI * 2);
-      ctx.moveTo(x - 34 * s, 50);
-      ctx.arc(x, 50, 34 * s, Math.PI, 0);
-    }
-  } else if (name === "chart") {
-    for (const [x, h] of [[-38, 34], [-6, 64], [26, 94]] as const) ctx.roundRect(x, 50 - h, 22, h, 5);
-  } else {
-    // brain: two lobes with folds
-    for (const side of [-1, 1]) {
-      ctx.moveTo(0, -56);
-      ctx.bezierCurveTo(side * 30, -70, side * 62, -50, side * 58, -18);
-      ctx.bezierCurveTo(side * 72, 6, side * 60, 42, side * 32, 50);
-      ctx.bezierCurveTo(side * 18, 64, 0, 58, 0, 44);
-      ctx.moveTo(side * 22, -40);
-      ctx.bezierCurveTo(side * 38, -30, side * 24, -10, side * 40, 0);
-      ctx.moveTo(side * 16, 12);
-      ctx.bezierCurveTo(side * 34, 16, side * 30, 34, side * 18, 38);
-    }
-    ctx.moveTo(0, -56);
-    ctx.lineTo(0, 44);
-  }
-  ctx.stroke();
+function tex(c: HTMLCanvasElement) {
   const t = new THREE.CanvasTexture(c);
   t.colorSpace = THREE.SRGBColorSpace;
   t.anisotropy = 8;
   return t;
 }
 
-function aiTexture() {
-  const S = 256;
+function radialTex() {
   const c = document.createElement("canvas");
-  c.width = c.height = S;
+  c.width = c.height = 256;
   const ctx = c.getContext("2d")!;
-  ctx.fillStyle = "#fff";
-  ctx.font = `700 124px Montserrat, Arial, sans-serif`;
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  ctx.fillText("AI", S / 2, S / 2 + 6);
-  const t = new THREE.CanvasTexture(c);
-  t.colorSpace = THREE.SRGBColorSpace;
+  const g = ctx.createRadialGradient(128, 128, 0, 128, 128, 128);
+  g.addColorStop(0, "rgba(255,255,255,1)");
+  g.addColorStop(0.25, "rgba(255,255,255,0.35)");
+  g.addColorStop(1, "rgba(255,255,255,0)");
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, 256, 256);
+  return tex(c);
+}
+
+/** A vertical light shaft: soft sides, strongest at the top, fading down. */
+function beamTex() {
+  const c = document.createElement("canvas");
+  c.width = 64;
+  c.height = 256;
+  const ctx = c.getContext("2d")!;
+  const img = ctx.createImageData(64, 256);
+  for (let y = 0; y < 256; y++)
+    for (let x = 0; x < 64; x++) {
+      const dx = (x - 32) / 32;
+      const i = (y * 64 + x) * 4;
+      img.data[i] = img.data[i + 1] = img.data[i + 2] = 255;
+      img.data[i + 3] = Math.round(Math.exp(-dx * dx * 5) * Math.pow(1 - y / 256, 1.6) * 255);
+    }
+  ctx.putImageData(img, 0, 0);
+  return tex(c);
+}
+
+type Icon = "brain" | "cloud" | "code" | "chart";
+
+function drawIcon(ctx: CanvasRenderingContext2D, icon: Icon, x: number, y: number, s: number) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(s / 100, s / 100);
+  ctx.strokeStyle = "#eaf1ff";
+  ctx.lineWidth = 6;
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  ctx.beginPath();
+  if (icon === "cloud") {
+    ctx.moveTo(18, 74);
+    ctx.lineTo(80, 74);
+    ctx.arc(78, 56, 18, Math.PI / 2, -Math.PI / 2.4, true);
+    ctx.arc(52, 40, 26, -0.15, Math.PI * 1.05, true);
+    ctx.arc(24, 56, 18, -Math.PI / 2.2, Math.PI / 2, true);
+  } else if (icon === "code") {
+    ctx.moveTo(30, 28);
+    ctx.lineTo(8, 50);
+    ctx.lineTo(30, 72);
+    ctx.moveTo(70, 28);
+    ctx.lineTo(92, 50);
+    ctx.lineTo(70, 72);
+    ctx.moveTo(58, 18);
+    ctx.lineTo(42, 82);
+  } else if (icon === "chart") {
+    for (const [bx, h] of [[14, 30], [40, 50], [66, 74]] as const) ctx.roundRect(bx, 86 - h, 18, h, 4);
+  } else {
+    // brain: two lobes with folds
+    for (const side of [-1, 1]) {
+      ctx.moveTo(50, 14);
+      ctx.bezierCurveTo(50 + side * 22, 6, 50 + side * 46, 18, 50 + side * 42, 42);
+      ctx.bezierCurveTo(50 + side * 52, 60, 50 + side * 40, 84, 50 + side * 20, 86);
+      ctx.bezierCurveTo(50 + side * 10, 92, 50, 88, 50, 80);
+      ctx.moveTo(50 + side * 16, 26);
+      ctx.bezierCurveTo(50 + side * 30, 34, 50 + side * 18, 46, 50 + side * 32, 54);
+      ctx.moveTo(50 + side * 12, 62);
+      ctx.bezierCurveTo(50 + side * 26, 64, 50 + side * 24, 76, 50 + side * 14, 78);
+    }
+    ctx.moveTo(50, 14);
+    ctx.lineTo(50, 80);
+  }
+  ctx.stroke();
+  ctx.restore();
+}
+
+/** A frosted glass card: the panel, its lit border, icon, title, two lines and an arrow. */
+function cardTex(icon: Icon, title: string, lines: string[]) {
+  const W = 760,
+    H = 690;
+  const c = document.createElement("canvas");
+  c.width = W;
+  c.height = H;
+  const ctx = c.getContext("2d")!;
+  const draw = () => {
+    ctx.clearRect(0, 0, W, H);
+    const r = 34;
+    // glass body: cool, brighter toward the top right where the light catches it
+    const body = ctx.createLinearGradient(0, H, W, 0);
+    body.addColorStop(0, "rgba(58,66,82,0.34)");
+    body.addColorStop(0.55, "rgba(74,84,102,0.4)");
+    body.addColorStop(1, "rgba(150,162,186,0.5)");
+    ctx.beginPath();
+    ctx.roundRect(6, 6, W - 12, H - 12, r);
+    ctx.fillStyle = body;
+    ctx.fill();
+    const sheen = ctx.createRadialGradient(W * 0.92, H * 0.06, 0, W * 0.92, H * 0.06, W * 0.7);
+    sheen.addColorStop(0, "rgba(232,238,248,0.3)");
+    sheen.addColorStop(1, "rgba(232,238,248,0)");
+    ctx.fillStyle = sheen;
+    ctx.fill();
+    // border: bright on the top and right edges, softer elsewhere
+    const edge = ctx.createLinearGradient(0, H, W, 0);
+    edge.addColorStop(0, "rgba(196,206,224,0.35)");
+    edge.addColorStop(0.6, "rgba(214,224,242,0.6)");
+    edge.addColorStop(1, "rgba(244,247,252,1)");
+    ctx.lineWidth = 5;
+    ctx.strokeStyle = edge;
+    ctx.stroke();
+
+    drawIcon(ctx, icon, 70, 66, 110);
+    ctx.fillStyle = "#f4f7ff";
+    ctx.font = "500 58px Montserrat, Arial, sans-serif";
+    ctx.fillText(title, 72, 290);
+    ctx.fillStyle = "rgba(220,228,245,0.82)";
+    ctx.font = "400 40px Montserrat, Arial, sans-serif";
+    lines.forEach((l, i) => ctx.fillText(l, 74, 372 + i * 56));
+    // arrow
+    ctx.strokeStyle = "rgba(232,240,255,0.9)";
+    ctx.lineWidth = 4;
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    ctx.moveTo(74, 590);
+    ctx.lineTo(118, 590);
+    ctx.moveTo(104, 576);
+    ctx.lineTo(118, 590);
+    ctx.lineTo(104, 604);
+    ctx.stroke();
+  };
+  draw();
+  const t = tex(c);
+  // redraw once the site font has loaded, so the card text is set in Montserrat
+  document.fonts?.ready.then(() => {
+    draw();
+    t.needsUpdate = true;
+  });
   return t;
 }
 
-function gridTexture() {
+/** The chip inside the cube: a circuit-etched face; the front face carries "AI". */
+function chipTex(withLabel: boolean) {
   const S = 512;
   const c = document.createElement("canvas");
   c.width = c.height = S;
   const ctx = c.getContext("2d")!;
-  ctx.strokeStyle = "rgba(255,255,255,0.55)";
-  ctx.lineWidth = 1.2;
-  for (let i = 0; i <= 14; i++) {
-    const p = (i / 14) * S;
-    ctx.beginPath();
-    ctx.moveTo(p, 0);
-    ctx.lineTo(p, S);
-    ctx.moveTo(0, p);
-    ctx.lineTo(S, p);
-    ctx.stroke();
-  }
-  ctx.globalCompositeOperation = "destination-in";
-  const g = ctx.createRadialGradient(S / 2, S / 2, 0, S / 2, S / 2, S / 2);
-  g.addColorStop(0, "rgba(0,0,0,1)");
-  g.addColorStop(1, "rgba(0,0,0,0)");
-  ctx.fillStyle = g;
-  ctx.fillRect(0, 0, S, S);
-  return new THREE.CanvasTexture(c);
-}
-
-function glowTexture() {
-  const c = document.createElement("canvas");
-  c.width = c.height = 128;
-  const ctx = c.getContext("2d")!;
-  const g = ctx.createRadialGradient(64, 64, 0, 64, 64, 64);
-  g.addColorStop(0, "rgba(255,255,255,1)");
-  g.addColorStop(0.25, "rgba(255,255,255,0.4)");
-  g.addColorStop(1, "rgba(255,255,255,0)");
-  ctx.fillStyle = g;
-  ctx.fillRect(0, 0, 128, 128);
-  return new THREE.CanvasTexture(c);
-}
-
-/* ------------------------------------------------------------------ */
-/* Layout                                                              */
-/* ------------------------------------------------------------------ */
-
-const CUBE = 1.45;
-const STEP_TOP = 0.36; // top of the platform
-const CUBE_Y = STEP_TOP + CUBE / 2 + 0.02;
-
-type Tile = { name: IconName; pos: THREE.Vector3; delay: number; wire: THREE.Vector3[]; nodes: THREE.Vector3[] };
-
-/**
- * Circuit trace from a tile down to the floor, then along the floor at right angles
- * (parallel to the platform's edges) into the platform's side.
- */
-function trace(from: THREE.Vector3, _entry: THREE.Vector3) {
-  // out of the tile's bottom edge, a soft bend, then level into the cube's side
-  const dir = new THREE.Vector3(from.x, 0, from.z).normalize();
-  const bottom = from.clone().setY(from.y - 0.5);
-  const lowY = Math.min(bottom.y - 0.25, STEP_TOP + 0.45);
-  const drop = bottom.clone().setY(lowY);
-  const entry = dir.clone().multiplyScalar(CUBE / 2 + 0.02).setY(STEP_TOP + 0.3);
-  const before = dir.clone().multiplyScalar(CUBE / 2 + 0.55).setY(STEP_TOP + 0.3);
-  const mid = drop.clone().lerp(before, 0.5).setY((lowY + STEP_TOP + 0.3) / 2);
-  const curve = new THREE.CatmullRomCurve3([bottom, drop, mid, before, entry], false, "centripetal");
-  return { wire: curve.getPoints(48), nodes: [bottom, mid] };
-}
-
-const TILES: Tile[] = (
-  [
-    ["brain", at(-2.2, 2.4, -0.3), new THREE.Vector3(-1.72, 0, -0.35), 0.25],
-    ["document", at(1.7, 2.75, -1.05), new THREE.Vector3(0.35, 0, -1.72), 0.35],
-    ["cloud", at(3.3, 1.9, -0.2), new THREE.Vector3(1.72, 0, -0.9), 0.45],
-    ["people", at(-3.0, 0.95, 0.75), new THREE.Vector3(-0.8, 0, 1.72), 0.3],
-    ["chart", at(2.35, 0.95, 1.65), new THREE.Vector3(1.72, 0, 0.7), 0.4],
-  ] as const
-).map(([name, pos, entry, delay]) => ({ name, pos, delay, ...trace(pos, entry) }));
-
-const BLOCKS = [at(-1.5, 0.27, 2.05), at(3.45, 0.27, 0.95), at(-0.7, 0.27, -2.8), at(3.75, 0.27, -2.3)];
-
-/** Point along a polyline at 0..1 of its length. */
-function along(points: THREE.Vector3[], t: number, out: THREE.Vector3) {
-  const lens = points.slice(1).map((p, i) => p.distanceTo(points[i]));
-  let d = t * lens.reduce((a, b) => a + b, 0);
-  for (let i = 0; i < lens.length; i++) {
-    if (d <= lens[i]) return out.lerpVectors(points[i], points[i + 1], d / lens[i]);
-    d -= lens[i];
-  }
-  return out.copy(points[points.length - 1]);
-}
-
-const hover = { index: -1 };
-
-const TILE_EDGES = new THREE.EdgesGeometry(new THREE.BoxGeometry(0.94, 0.94, 0.09));
-
-/* ------------------------------------------------------------------ */
-/* Tiles: thick frosted glass with a glowing icon inside                */
-/* ------------------------------------------------------------------ */
-
-function TileMesh({ tile, index, glass }: { tile: Tile; index: number; glass: THREE.Material }) {
-  const group = useRef<THREE.Group>(null);
-  const icon = useRef<THREE.MeshBasicMaterial>(null);
-  const tex = useMemo(() => iconTexture(tile.name), [tile.name]);
-  const lift = useRef(0);
-  useFrame((state, dt) => {
-    const e = ease((clock.t - tile.delay) / 1.1);
-    lift.current = THREE.MathUtils.damp(lift.current, hover.index === index ? 1 : 0, 8, dt);
-    const g = group.current;
-    if (!g) return;
-    g.visible = e > 0.001;
-    g.position.copy(tile.pos);
-    g.position.y += -(1 - e) * 1.2 + Math.sin(state.clock.elapsedTime * 0.8 + index) * 0.035 + lift.current * 0.25;
-    g.position.addScaledVector(FRONT, lift.current * 0.2);
-    g.scale.setScalar(0.85 + 0.15 * e + lift.current * 0.05);
-    if (icon.current) icon.current.color.setScalar(e * (1.7 + lift.current * 1.2));
-  });
-  const onOver = (e: ThreeEvent<PointerEvent>) => {
-    e.stopPropagation();
-    hover.index = index;
-    document.body.style.cursor = "pointer";
+  const draw = () => {
+    ctx.clearRect(0, 0, S, S);
+    const bg = ctx.createRadialGradient(S / 2, S / 2, 0, S / 2, S / 2, S * 0.7);
+    bg.addColorStop(0, "rgba(118,128,148,0.95)");
+    bg.addColorStop(1, "rgba(30,35,46,0.95)");
+    ctx.fillStyle = bg;
+    ctx.fillRect(0, 0, S, S);
+    // pins around the edge
+    ctx.fillStyle = "rgba(214,222,236,0.85)";
+    for (let i = 0; i < 18; i++) {
+      const p = 52 + i * 23.5;
+      ctx.fillRect(p, 14, 7, 26);
+      ctx.fillRect(p, S - 40, 7, 26);
+      ctx.fillRect(14, p, 26, 7);
+      ctx.fillRect(S - 40, p, 26, 7);
+    }
+    // inner die with traces
+    ctx.strokeStyle = "rgba(226,232,244,0.9)";
+    ctx.lineWidth = 6;
+    ctx.strokeRect(70, 70, S - 140, S - 140);
+    ctx.strokeStyle = "rgba(190,200,220,0.35)";
+    ctx.lineWidth = 2;
+    for (let i = 0; i < 14; i++) {
+      const p = 96 + i * 23;
+      ctx.beginPath();
+      ctx.moveTo(p, 90);
+      ctx.lineTo(p, 140 + (i % 3) * 20);
+      ctx.moveTo(p, S - 90);
+      ctx.lineTo(p, S - 140 - (i % 4) * 16);
+      ctx.stroke();
+    }
+    if (withLabel) {
+      ctx.fillStyle = "#ffffff";
+      ctx.shadowColor = "rgba(236,240,248,1)";
+      ctx.shadowBlur = 30;
+      ctx.font = "700 190px Montserrat, Arial, sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText("AI", S / 2, S / 2 + 10);
+      ctx.shadowBlur = 0;
+    }
   };
-  const onOut = () => {
-    if (hover.index === index) hover.index = -1;
-    document.body.style.cursor = "";
-  };
-  return (
-    <group ref={group} rotation={[0, Math.PI / 4 - tile.pos.dot(RIGHT) * 0.13, 0]} visible={false} onPointerOver={onOver} onPointerOut={onOut}>
-      <RoundedBox args={[0.95, 0.95, 0.09]} radius={0.035} smoothness={4} material={glass} />
-      <lineSegments geometry={TILE_EDGES}>
-        <lineBasicMaterial color={[1.5, 1.5, 1.5]} transparent opacity={0.3} toneMapped={false} />
-      </lineSegments>
-      {/* the icon, glowing on the glass face */}
-      <mesh position={[0, 0, 0.05]}>
-        <planeGeometry args={[0.56, 0.56]} />
-        <meshBasicMaterial ref={icon} map={tex} color={[0, 0, 0]} transparent depthWrite={false} toneMapped={false} />
-      </mesh>
-    </group>
-  );
-}
-
-/* ------------------------------------------------------------------ */
-/* Cables and data flow                                                */
-/* ------------------------------------------------------------------ */
-
-/** Soft elongated streak (a data packet): bright head, fading tail. */
-function streakTexture() {
-  const c = document.createElement("canvas");
-  c.width = 256;
-  c.height = 32;
-  const ctx = c.getContext("2d")!;
-  const g = ctx.createLinearGradient(0, 0, 256, 0);
-  g.addColorStop(0, "rgba(255,255,255,0)");
-  g.addColorStop(0.75, "rgba(255,255,255,0.55)");
-  g.addColorStop(0.97, "rgba(255,255,255,1)");
-  g.addColorStop(1, "rgba(255,255,255,0)");
-  ctx.fillStyle = g;
-  ctx.fillRect(0, 0, 256, 32);
-  ctx.globalCompositeOperation = "destination-in";
-  const v = ctx.createLinearGradient(0, 0, 0, 32);
-  v.addColorStop(0, "rgba(0,0,0,0)");
-  v.addColorStop(0.5, "rgba(0,0,0,1)");
-  v.addColorStop(1, "rgba(0,0,0,0)");
-  ctx.fillStyle = v;
-  ctx.fillRect(0, 0, 256, 32);
-  return new THREE.CanvasTexture(c);
-}
-
-const PACKETS = 3; // data packets in flight per cable
-
-/**
- * Real cables: a thin dark sheathed tube with a lit glass core running through it, glowing
- * junction beads, a small port where each cable meets the cube, and packets of light that
- * travel from the tile into the cube (brightening the beads as they pass).
- */
-function Cables({ glow }: { glow: THREE.Texture }) {
-  const streak = useMemo(() => streakTexture(), []);
-  const data = useMemo(
-    () =>
-      TILES.map((tile) => {
-        const curve = new THREE.CatmullRomCurve3(tile.wire, false, "centripetal");
-        return {
-          curve,
-          sheath: new THREE.TubeGeometry(curve, 120, 0.016, 10, false),
-          core: new THREE.TubeGeometry(curve, 120, 0.007, 8, false),
-          length: curve.getLength(),
-        };
-      }),
-    [],
-  );
-  const sheathMat = useMemo(
-    () =>
-      new THREE.MeshPhysicalMaterial({ color: "#a8a8b0", metalness: 0.2, roughness: 0.15, clearcoat: 1, envMapIntensity: 2, transparent: true, opacity: 0, depthWrite: false }),
-    [],
-  );
-  const coreMats = useRef<(THREE.MeshBasicMaterial | null)[]>([]);
-  const packets = useRef<(THREE.Mesh | null)[]>([]);
-  const heads = useRef<(THREE.Sprite | null)[]>([]);
-  const beads = useRef<(THREE.MeshBasicMaterial | null)[]>([]);
-  const phase = useMemo(() => TILES.map((_, i) => i * 0.19), []);
-  const p = useMemo(() => new THREE.Vector3(), []);
-  const tan = useMemo(() => new THREE.Vector3(), []);
-  const cam = useThree((st) => st.camera);
-
-  useFrame((state, dt) => {
-    const t = state.clock.elapsedTime;
-    let sheathShown = 0;
-    TILES.forEach((tile, i) => {
-      const draw = ease((clock.t - tile.delay - 0.45) / 1.2);
-      sheathShown = Math.max(sheathShown, draw);
-      const hot = hover.index === i;
-      const cm = coreMats.current[i];
-      if (cm) cm.color.setScalar((1.1 + 0.2 * Math.sin(t * 2 + i)) * draw * (hot ? 1.7 : 1));
-      phase[i] = (phase[i] + dt * (hot ? 0.95 : 0.28)) % 1;
-
-      for (let k = 0; k < PACKETS; k++) {
-        const u = (phase[i] + k / PACKETS) % 1;
-        const idx = i * PACKETS + k;
-        const m = packets.current[idx];
-        const h = heads.current[idx];
-        const fade = Math.min(1, u * 8, (1 - u) * 8) * draw; // fade in at the tile, out at the cube
-        data[i].curve.getPointAt(u, p);
-        data[i].curve.getTangentAt(u, tan);
-        if (m) {
-          // orient the streak along the cable, facing the camera
-          m.position.copy(p);
-          const view = cam.position.clone().sub(p).normalize();
-          const up = new THREE.Vector3().crossVectors(view, tan).normalize();
-          const normal = new THREE.Vector3().crossVectors(tan, up);
-          m.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(tan, up, normal));
-          (m.material as THREE.MeshBasicMaterial).opacity = fade * (hot ? 1 : 0.85);
-          m.scale.set(hot ? 0.4 : 0.3, hot ? 0.05 : 0.04, 1);
-        }
-        if (h) {
-          h.position.copy(p);
-          h.material.opacity = fade;
-          h.scale.setScalar(hot ? 0.16 : 0.11);
-        }
-      }
-      // beads flash when a packet passes them
-      const b0 = beads.current[i * 2], b1 = beads.current[i * 2 + 1];
-      const near = (u0: number) => {
-        let best = 1;
-        for (let k = 0; k < PACKETS; k++) best = Math.min(best, Math.abs(((phase[i] + k / PACKETS) % 1) - u0));
-        return 1 - THREE.MathUtils.smoothstep(best, 0, 0.08);
-      };
-      if (b0) b0.color.setScalar((1.2 + 2 * near(0.02)) * draw);
-      if (b1) b1.color.setScalar((1 + 2 * near(0.5)) * draw);
-    });
-    sheathMat.opacity = 0.28 * sheathShown;
+  draw();
+  const t = tex(c);
+  document.fonts?.ready.then(() => {
+    draw();
+    t.needsUpdate = true;
   });
+  return t;
+}
 
+/* ------------------------------------------------------------------ */
+/* Cube                                                                */
+/* ------------------------------------------------------------------ */
+
+/** Thin glowing bars along the 12 edges of a cube of side s. */
+function EdgeFrame({ s, color, intensity }: { s: number; color: THREE.Color; intensity: number }) {
+  const mat = useMemo(() => new THREE.MeshBasicMaterial({ color: color.clone().multiplyScalar(intensity), toneMapped: false }), [color, intensity]);
+  const h = s / 2;
+  const w = 0.018;
+  const bars: [number, number, number, number, number, number][] = [];
+  for (const a of [-h, h])
+    for (const b of [-h, h]) {
+      bars.push([0, a, b, s, w, w]);
+      bars.push([a, 0, b, w, s, w]);
+      bars.push([a, b, 0, w, w, s]);
+    }
   return (
     <>
-      {data.map((d, i) => (
-        <group key={i}>
-          <mesh geometry={d.sheath} material={sheathMat} />
-          <mesh geometry={d.core}>
-            <meshBasicMaterial
-              ref={(m) => {
-                coreMats.current[i] = m;
-              }}
-              color={[0, 0, 0]}
-              toneMapped={false}
-            />
-          </mesh>
-          {/* junction beads: where the cable leaves the tile, and the bend */}
-          {[TILES[i].nodes[0], TILES[i].nodes[1]].map((n, k) => (
-            <mesh key={k} position={n}>
-              <sphereGeometry args={[0.03, 16, 16]} />
-              <meshBasicMaterial
-                ref={(m) => {
-                  beads.current[i * 2 + k] = m;
-                }}
-                color={[0, 0, 0]}
-                toneMapped={false}
-              />
-            </mesh>
-          ))}
-          {Array.from({ length: PACKETS }, (_, k) => (
-            <group key={k}>
-              <mesh
-                ref={(m) => {
-                  packets.current[i * PACKETS + k] = m;
-                }}
-              >
-                <planeGeometry args={[1, 1]} />
-                <meshBasicMaterial map={streak} color={[2.6, 2.6, 2.6]} transparent opacity={0} depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} side={THREE.DoubleSide} />
-              </mesh>
-              <sprite
-                ref={(sp) => {
-                  heads.current[i * PACKETS + k] = sp;
-                }}
-              >
-                <spriteMaterial map={glow} color={[2.4, 2.4, 2.4]} transparent opacity={0} depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} />
-              </sprite>
-            </group>
-          ))}
-        </group>
+      {bars.map(([x, y, z, sx, sy, sz], i) => (
+        <mesh key={i} position={[x, y, z]} material={mat}>
+          <boxGeometry args={[sx, sy, sz]} />
+        </mesh>
       ))}
     </>
   );
 }
 
-
-/* ------------------------------------------------------------------ */
-/* The AI cube: a clear glass shell around a frosted, glowing inner cube */
-/* ------------------------------------------------------------------ */
-
-/** Cube edges, brighter at the bottom (lit by the base) and fading toward the top. */
-function gradientEdges(size: number) {
-  const g = new THREE.EdgesGeometry(new THREE.BoxGeometry(size, size, size));
-  const pos = g.attributes.position as THREE.BufferAttribute;
-  const col = new Float32Array(pos.count * 3);
-  for (let i = 0; i < pos.count; i++) {
-    const y = pos.getY(i) / size + 0.5; // 0 bottom .. 1 top
-    const v = 1.5 - 0.9 * y;
-    col.set([v, v, v], i * 3);
-  }
-  g.setAttribute("color", new THREE.BufferAttribute(col, 3));
-  return g;
-}
-
-/** Frosted, internally lit glass for the cube (deterministic, no refraction blur). */
-function frostedGlass(side: THREE.Side, strength: number) {
-  return new THREE.ShaderMaterial({
-    side,
-    transparent: true,
-    depthWrite: false,
-    uniforms: { uGlow: { value: 0 }, uStrength: { value: strength } },
-    vertexShader: /* glsl */ `
-      varying vec2 vUv; varying float vY; varying vec3 vN; varying vec3 vV;
-      void main() {
-        vUv = uv;
-        vY = position.y / ${CUBE.toFixed(3)} + 0.5;
-        vec4 mv = modelViewMatrix * vec4(position, 1.0);
-        vN = normalize(normalMatrix * normal);
-        vV = normalize(-mv.xyz);
-        gl_Position = projectionMatrix * mv;
-      }`,
-    fragmentShader: /* glsl */ `
-      uniform float uGlow, uStrength;
-      varying vec2 vUv; varying float vY; varying vec3 vN; varying vec3 vV;
-      void main() {
-        float edge = min(min(vUv.x, 1.0 - vUv.x), min(vUv.y, 1.0 - vUv.y));
-        float rim = 1.0 - smoothstep(0.0, 0.09, edge);       // bright bevel band
-        float inner = 1.0 - smoothstep(0.1, 0.16, abs(edge - 0.16)); // faint inner frame
-        float up = clamp(vY, 0.0, 1.0);
-        float lift = mix(1.0, 0.32, pow(up, 0.8));             // base light fading upward
-        float top = step(0.9, abs(vN.y));                       // top face: evenly lit, dimmer
-        float body = mix(0.3 * lift, 0.2, top);
-        float fres = pow(clamp(1.0 - abs(dot(normalize(vN), normalize(vV))), 0.0, 1.0), 2.0);
-        vec3 col = vec3(body + rim * mix(0.95, 0.45, up) + inner * 0.07 + fres * 0.15);
-        float alpha = clamp(0.35 + body * 0.9 + rim * 0.5, 0.0, 0.95);
-        gl_FragColor = vec4(col * uGlow * uStrength * 1.2, alpha * uGlow);
-      }`,
-  });
-}
-
-function Core({ glow }: { glow: THREE.Texture }) {
+function Cube({ glow }: { glow: THREE.Texture }) {
   const group = useRef<THREE.Group>(null);
-  const glassFront = useMemo(() => frostedGlass(THREE.FrontSide, 1), []);
-  const glassBack = useMemo(() => frostedGlass(THREE.BackSide, 0.45), []);
-  const label = useRef<THREE.MeshBasicMaterial>(null);
-  const halo = useRef<THREE.SpriteMaterial>(null);
-  const outerLine = useRef<THREE.LineBasicMaterial>(null);
-  const innerLine = useRef<THREE.LineBasicMaterial>(null);
-  const baseGlow = useRef<THREE.MeshBasicMaterial>(null);
-  const ai = useMemo(() => aiTexture(), []);
-  const outerEdges = useMemo(() => gradientEdges(CUBE * 0.992), []);
-  const innerEdges = useMemo(() => gradientEdges(CUBE * 0.62), []);
+  const core = useRef<THREE.SpriteMaterial>(null);
+  const glass = useMemo(
+    () =>
+      new THREE.MeshPhysicalMaterial({
+        color: "#c4ccd8",
+        metalness: 0,
+        roughness: 0.08,
+        transparent: true,
+        opacity: 0.22,
+        clearcoat: 1,
+        envMapIntensity: 1.8,
+        emissive: new THREE.Color("#5c6678"),
+        emissiveIntensity: 0.45,
+        depthWrite: false,
+        side: THREE.DoubleSide,
+      }),
+    [],
+  );
+  const chip = useMemo(() => {
+    const face = new THREE.MeshBasicMaterial({ map: chipTex(false), toneMapped: false, transparent: true, opacity: 0.95 });
+    const front = new THREE.MeshBasicMaterial({ map: chipTex(true), toneMapped: false, color: new THREE.Color(1.6, 1.65, 1.75) });
+    // box faces: +x, -x, +y, -y, +z, -z — "AI" on -x, which the 45° turn points to the viewer's front-left
+    return [face, front, face, face, face, face];
+  }, []);
 
-  useFrame((state) => {
-    const e = ease((clock.t - 0.15) / 1.3);
-    const g = group.current;
-    if (!g) return;
-    g.visible = e > 0.001;
-    g.position.y = CUBE_Y + (1 - e) * 1.4 + Math.sin(state.clock.elapsedTime * 0.9) * 0.02 * e;
-    g.rotation.y = (1 - e) * 0.8;
-    const beat = 0.9 + 0.1 * Math.sin(state.clock.elapsedTime * 2.2) + (hover.index >= 0 ? 0.2 : 0);
-    glassFront.uniforms.uGlow.value = e * beat;
-    glassBack.uniforms.uGlow.value = e * beat;
-    if (label.current) label.current.color.setScalar(2.4 * e);
-    if (halo.current) halo.current.opacity = 0.16 * e * beat;
-    if (outerLine.current) outerLine.current.opacity = 0.75 * e;
-    if (innerLine.current) innerLine.current.opacity = 0.45 * e * beat;
-    if (baseGlow.current) baseGlow.current.opacity = 0.75 * e * beat;
+  useFrame(() => {
+    const e = ease((clock.t - 0.1) / 1.6);
+    if (group.current) {
+      group.current.visible = e > 0.001;
+      // settles onto the platform and then stays still, so the light on the base never shifts
+      group.current.position.y = CUBE_POS.y - (1 - e) * 0.5;
+      group.current.scale.setScalar(0.94 + 0.06 * e);
+    }
+    if (core.current) core.current.opacity = 0.8 * e; // steady: no pulsing glow on the platform
   });
 
   return (
-    <group ref={group} visible={false}>
-      <lineSegments geometry={innerEdges}>
-        <lineBasicMaterial ref={innerLine} vertexColors transparent opacity={0} toneMapped={false} />
-      </lineSegments>
-      {/* frosted glass lit from within: brightest at the base, where the platform light
-          enters, fading toward the top; faces glow more toward their edges (thicker glass) */}
-      <mesh material={glassBack}>
+    <group ref={group} position={CUBE_POS} rotation={[0, CUBE_ROT, 0]} visible={false}>
+      {/* outer glass shell and its glowing frame */}
+      <mesh material={glass}>
         <boxGeometry args={[CUBE, CUBE, CUBE]} />
       </mesh>
-      <mesh material={glassFront}>
-        <boxGeometry args={[CUBE, CUBE, CUBE]} />
+      <EdgeFrame s={CUBE} color={BLUE} intensity={2.4} />
+      {/* the chip, and the glass shell just around it */}
+      <mesh material={chip}>
+        <boxGeometry args={[CUBE * 0.5, CUBE * 0.5, CUBE * 0.5]} />
       </mesh>
-      {/* bevel highlights: bright where the base lights them, fading upward */}
-      <lineSegments geometry={outerEdges}>
-        <lineBasicMaterial ref={outerLine} vertexColors transparent opacity={0} toneMapped={false} />
-      </lineSegments>
-      {/* "AI", glowing on the front face */}
-      <mesh position={[0, 0, CUBE / 2 + 0.004]}>
-        <planeGeometry args={[CUBE * 0.62, CUBE * 0.62]} />
-        <meshBasicMaterial ref={label} map={ai} color={[0, 0, 0]} transparent depthWrite={false} toneMapped={false} />
+      <mesh material={glass}>
+        <boxGeometry args={[CUBE * 0.66, CUBE * 0.66, CUBE * 0.66]} />
       </mesh>
-      {/* light pooling under the cube, on the platform */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -CUBE / 2 - 0.012, 0]} scale={CUBE * 1.9}>
-        <planeGeometry />
-        <meshBasicMaterial ref={baseGlow} map={glow} transparent opacity={0} depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} />
-      </mesh>
-      <sprite scale={3.2}>
-        <spriteMaterial ref={halo} map={glow} transparent opacity={0} depthWrite={false} blending={THREE.AdditiveBlending} />
+      <EdgeFrame s={CUBE * 0.66} color={BLUE} intensity={1.6} />
+      {/* light inside the cube */}
+      <sprite scale={CUBE * 2.2}>
+        <spriteMaterial ref={core} map={glow} color="#aab4c6" transparent opacity={0} depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} />
       </sprite>
     </group>
   );
 }
 
 /* ------------------------------------------------------------------ */
-/* Platform: machined metal steps with a light strip round the cube     */
+/* Platform                                                            */
 /* ------------------------------------------------------------------ */
+
+const STEPS: [number, number, number][] = [
+  // [size, height, top y]
+  [3.55, 0.22, FLOOR_Y + 0.22],
+  [3.0, 0.15, FLOOR_Y + 0.37],
+  [2.45, 0.11, FLOOR_Y + 0.48],
+];
 
 function Platform() {
   const group = useRef<THREE.Group>(null);
-  const strips = useRef<(THREE.MeshBasicMaterial | null)[]>([]);
-  const metal = useMemo(
-    () => new THREE.MeshPhysicalMaterial({ color: "#0d0d0f", metalness: 0.85, roughness: 0.28, clearcoat: 0.6, clearcoatRoughness: 0.2, envMapIntensity: 1.4 }),
-    [],
-  );
+  // shaded by hand (unlit): it doesn't wait on the scene's lighting or environment map, so it
+  // appears in the same frame as everything else. Faces: +x, -x, +y (top), -y, +z, -z.
+  const dark = useMemo(() => {
+    const m = (c: string) => new THREE.MeshBasicMaterial({ color: c });
+    const top = m("#1a1d24");
+    const left = m("#0f1115"); // front-left face, toward the light
+    const right = m("#0a0b0e"); // front-right face
+    const hidden = m("#06070a");
+    return [hidden, left, top, hidden, right, hidden];
+  }, []);
+  // light strips along each step's two front edges: a soft silver-white
+  const strips = useMemo(() => STEPS.map(() => new THREE.MeshBasicMaterial({ color: new THREE.Color(0, 0, 0), toneMapped: false })), []);
   useFrame(() => {
-    const e = ease(clock.t / 1.1);
-    if (group.current) {
-      group.current.visible = e > 0.001;
-      group.current.position.y = -(1 - e) * 0.4;
-    }
-    strips.current.forEach((m) => m && m.color.setScalar(0.8 * ease((clock.t - 0.6) / 0.9)));
+    const e = ease(clock.t / 1.4);
+    if (group.current) group.current.visible = e > 0.001;
+    strips.forEach((m, i) => {
+      const warm = i < 2;
+      m.color.setRGB(warm ? 0.62 : 0.85, warm ? 0.62 : 0.88, warm ? 0.64 : 0.95).multiplyScalar(e);
+    });
   });
-  const ring = CUBE + 0.28; // light strip just outside the cube's footprint
   return (
-    <group ref={group} visible={false}>
-      <RoundedBox args={[3.5, 0.18, 3.5]} radius={0.04} smoothness={3} position={[0, 0.09, 0]} material={metal} />
-      <RoundedBox args={[2.7, 0.18, 2.7]} radius={0.04} smoothness={3} position={[0, 0.27, 0]} material={metal} />
-      {/* recessed light strip around the cube's base */}
-      {(
-        [
-          [0, ring / 2, ring - 0.06, 0.022],
-          [0, -ring / 2, ring - 0.06, 0.022],
-          [ring / 2, 0, 0.022, ring - 0.06],
-          [-ring / 2, 0, 0.022, ring - 0.06],
-        ] as const
-      ).map(([x, z, w, d], i) => (
-        <mesh key={i} position={[x, STEP_TOP + 0.005, z]}>
-          <boxGeometry args={[w, 0.012, d]} />
-          <meshBasicMaterial
-            ref={(m) => {
-              strips.current[i] = m;
-            }}
-            color={[0, 0, 0]}
-            toneMapped={false}
-          />
-        </mesh>
+    <group ref={group} position={[CUBE_POS.x, 0, CUBE_POS.z]} rotation={[0, CUBE_ROT, 0]} visible={false}>
+      {STEPS.map(([s, h, top], i) => (
+        <group key={i}>
+          <mesh material={dark} position={[0, top - h / 2, 0]}>
+            <boxGeometry args={[s, h, s]} />
+          </mesh>
+          <mesh position={[0, top, s / 2]} material={strips[i]}>
+            <boxGeometry args={[s, 0.016, 0.016]} />
+          </mesh>
+          <mesh position={[-s / 2, top, 0]} material={strips[i]}>
+            <boxGeometry args={[0.016, 0.016, s]} />
+          </mesh>
+        </group>
       ))}
     </group>
   );
 }
 
 /* ------------------------------------------------------------------ */
-/* Floor: polished, reflecting the scene, with a faint grid              */
+/* Cards                                                               */
 /* ------------------------------------------------------------------ */
 
-function Floor({ glow }: { glow: THREE.Texture }) {
-  const grid = useMemo(() => gridTexture(), []);
-  const reflector = useRef<ComponentRef<typeof MeshReflectorMaterial>>(null);
-  const gridMat = useRef<THREE.MeshBasicMaterial>(null);
-  const poolMat = useRef<THREE.MeshBasicMaterial>(null);
-  useFrame(() => {
-    const e = ease(clock.t / 1.4);
-    if (reflector.current) reflector.current.opacity = e;
-    if (gridMat.current) gridMat.current.opacity = 0.03 * e;
-    if (poolMat.current) poolMat.current.opacity = 0.14 * ease((clock.t - 0.5) / 1.4);
+type Card = { icon: Icon; title: string; lines: string[]; pos: [number, number, number]; rot: [number, number, number]; w: number; delay: number };
+
+export const CARDS: Card[] = [
+  { icon: "brain", title: "AI Agents", lines: ["Autonomous systems", "that get work done."], pos: [-1.5, 2.15, 0.7], rot: [-0.12, 0.22, 0.03], w: 1.72, delay: 0.5 },
+  { icon: "cloud", title: "Cloud & Infrastructure", lines: ["Scalable. Secure.", "Always on."], pos: [2.95, 2.1, -0.6], rot: [-0.12, -0.12, -0.03], w: 1.66, delay: 0.62 },
+  { icon: "code", title: "Custom Solutions", lines: ["Tailored AI systems", "for your business."], pos: [-2.25, 0.1, 1.25], rot: [-0.14, 0.34, 0.12], w: 1.7, delay: 0.74 },
+  { icon: "chart", title: "Data & Analytics", lines: ["Turn data into", "decisions."], pos: [3.75, 0.25, 0.7], rot: [-0.14, -0.42, -0.1], w: 1.56, delay: 0.86 },
+];
+
+function CardMesh({ card, i }: { card: Card; i: number }) {
+  const group = useRef<THREE.Group>(null);
+  const mat = useMemo(
+    () =>
+      new THREE.MeshBasicMaterial({
+        map: cardTex(card.icon, card.title, card.lines),
+        transparent: true,
+        opacity: 0,
+        depthWrite: false,
+        side: THREE.DoubleSide,
+        toneMapped: false,
+      }),
+    [card],
+  );
+  const h = card.w * (690 / 760);
+  useFrame((state) => {
+    const e = ease((clock.t - card.delay) / 1.2);
+    const t = state.clock.elapsedTime;
+    if (group.current) {
+      group.current.visible = e > 0.001;
+      group.current.position.set(card.pos[0], card.pos[1] - (1 - e) * 0.4 + Math.sin(t * 0.6 + i * 1.7) * 0.06 * e, card.pos[2]);
+      group.current.rotation.set(card.rot[0], card.rot[1] + Math.sin(t * 0.4 + i) * 0.02, card.rot[2]);
+    }
+    mat.opacity = e;
   });
   return (
-    <>
-      <mesh rotation={[-Math.PI / 2, 0, 0]}>
-        <planeGeometry args={[60, 60]} />
-        <MeshReflectorMaterial
-          ref={reflector}
-          resolution={256}
-          blur={[220, 60]}
-          mixBlur={1}
-          mixStrength={2.6}
-          mixContrast={1}
-          depthScale={1.2}
-          minDepthThreshold={0.3}
-          maxDepthThreshold={1.4}
-          color="#040404"
-          metalness={0.5}
-          roughness={0.7}
-          envMapIntensity={0}
-          transparent
-          opacity={0}
-        />
+    <group ref={group} visible={false}>
+      <mesh material={mat} renderOrder={4}>
+        <planeGeometry args={[card.w, h]} />
       </mesh>
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.004, 0]}>
-        <planeGeometry args={[18, 18]} />
-        <meshBasicMaterial ref={gridMat} map={grid} transparent opacity={0} depthWrite={false} />
-      </mesh>
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.008, 0]} scale={6.5}>
-        <planeGeometry />
-        <meshBasicMaterial ref={poolMat} map={glow} transparent opacity={0} depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} />
-      </mesh>
-    </>
+    </group>
   );
 }
 
-function Blocks() {
-  const refs = useRef<(THREE.Group | null)[]>([]);
+/* ------------------------------------------------------------------ */
+/* Orbits                                                              */
+/* ------------------------------------------------------------------ */
+
+type Ring = { r: number; y: number; tiltX: number; tiltZ: number; bright: number; dots: number[]; speed: number; delay: number };
+
+const RINGS: Ring[] = [
+  { r: 2.25, y: 0.15, tiltX: 0.06, tiltZ: -0.05, bright: 1.3, dots: [0.2, 2.6, 4.4], speed: 0.09, delay: 0.3 },
+  { r: 3.35, y: -0.95, tiltX: 0.0, tiltZ: 0.04, bright: 1.1, dots: [1.2, 3.4, 5.6], speed: -0.06, delay: 0.42 },
+  { r: 4.25, y: 0.75, tiltX: -0.1, tiltZ: -0.16, bright: 0.65, dots: [0.7, 3.9], speed: 0.04, delay: 0.55 },
+];
+
+function RingMesh({ ring, glow }: { ring: Ring; glow: THREE.Texture }) {
+  const group = useRef<THREE.Group>(null);
   const mat = useMemo(
-    () => new THREE.MeshPhysicalMaterial({ color: "#141417", metalness: 0.4, roughness: 0.4, clearcoat: 0.8, clearcoatRoughness: 0.25, envMapIntensity: 1.3 }),
-    [],
+    () => new THREE.LineBasicMaterial({ color: BLUE.clone().multiplyScalar(ring.bright), transparent: true, opacity: 0, toneMapped: false, depthWrite: false }),
+    [ring],
   );
-  useFrame(() => {
-    refs.current.forEach((m, i) => {
-      if (!m) return;
-      const e = ease((clock.t - 0.2 - i * 0.08) / 1.1);
-      m.visible = e > 0.001;
-      m.position.y = BLOCKS[i].y - (1 - e) * 0.6;
+  const line = useMemo(() => {
+    const geo = new THREE.BufferGeometry().setFromPoints(
+      new THREE.EllipseCurve(0, 0, ring.r, ring.r, 0, Math.PI * 2, false, 0).getPoints(256).map((v) => new THREE.Vector3(v.x, 0, v.y)),
+    );
+    return new THREE.LineLoop(geo, mat);
+  }, [ring, mat]);
+  const dots = useRef<(THREE.Group | null)[]>([]);
+  useFrame((state) => {
+    const e = smooth((clock.t - ring.delay) / 1.6);
+    if (group.current) {
+      group.current.visible = e > 0.001;
+      group.current.scale.setScalar(0.85 + 0.15 * e);
+    }
+    mat.opacity = 0.75 * e;
+    const t = state.clock.elapsedTime;
+    dots.current.forEach((d, i) => {
+      if (!d) return;
+      const a = ring.dots[i] + t * ring.speed;
+      d.position.set(Math.cos(a) * ring.r, 0, Math.sin(a) * ring.r);
+      d.scale.setScalar(Math.max(0.001, e));
     });
   });
   return (
-    <>
-      {BLOCKS.map((p, i) => (
+    <group ref={group} position={[CUBE_POS.x, ring.y, CUBE_POS.z]} rotation={[ring.tiltX, 0, ring.tiltZ]} visible={false}>
+      <primitive object={line} />
+      {ring.dots.map((_, i) => (
         <group
           key={i}
-          ref={(m) => {
-            refs.current[i] = m;
+          ref={(g) => {
+            dots.current[i] = g;
           }}
-          position={p}
-          rotation={[0, Math.PI / 4, 0]}
-          visible={false}
         >
-          <RoundedBox args={[0.75, 0.54, 0.75]} radius={0.06} smoothness={4} material={mat} />
+          <mesh>
+            <sphereGeometry args={[0.035, 12, 12]} />
+            <meshBasicMaterial color={[3, 3.3, 4]} toneMapped={false} />
+          </mesh>
+          <sprite scale={0.22}>
+            <spriteMaterial map={glow} color="#e4eaf4" transparent opacity={0.8} depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} />
+          </sprite>
         </group>
+      ))}
+    </group>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Floor, light shafts                                                 */
+/* ------------------------------------------------------------------ */
+
+function Floor({ glow, beam }: { glow: THREE.Texture; beam: THREE.Texture }) {
+  const base = useRef<THREE.MeshBasicMaterial>(null);
+  const refl = useRef<THREE.MeshBasicMaterial>(null);
+  const pool = useRef<THREE.MeshBasicMaterial>(null);
+  useFrame(() => {
+    const e = ease(clock.t / 1.2);
+    if (base.current) base.current.opacity = e;
+    if (refl.current) refl.current.opacity = 0.9 * ease((clock.t - 0.4) / 1.6);
+    if (pool.current) pool.current.opacity = 0.35 * ease((clock.t - 0.3) / 1.6);
+  });
+  return (
+    <group position={[0, FLOOR_Y, 0]}>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.001, 4]} renderOrder={-2}>
+        <planeGeometry args={[40, 24]} />
+        <meshBasicMaterial ref={base} color="#07080b" transparent opacity={0} depthWrite={false} />
+      </mesh>
+      {/* the platform's glow pooled on the floor */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[CUBE_POS.x, 0.01, 0.6]} scale={[8, 5, 1]} renderOrder={-1}>
+        <planeGeometry />
+        <meshBasicMaterial ref={pool} map={glow} color="#8a94a8" transparent opacity={0} depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} />
+      </mesh>
+      {/* the cube's reflection: a soft column of light going down into the floor */}
+      <mesh position={[CUBE_POS.x, -1.7, 2.5]} scale={[1.2, 3.4, 1]} renderOrder={5}>
+        <planeGeometry />
+        <meshBasicMaterial ref={refl} map={beam} color="#dde3ee" transparent opacity={0} depthTest={false} depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} />
+      </mesh>
+    </group>
+  );
+}
+
+const SHAFTS: [number, number, number][] = [
+  // [x, width, strength]
+  [0.1, 1.2, 0.09],
+  [1.5, 2.0, 0.07],
+  [2.6, 0.9, 0.05],
+];
+
+function Shafts({ beam }: { beam: THREE.Texture }) {
+  const mats = useMemo(
+    () =>
+      SHAFTS.map(
+        () =>
+          new THREE.MeshBasicMaterial({
+            map: beam,
+            color: "#b8c2d4",
+            transparent: true,
+            opacity: 0,
+            depthWrite: false,
+            blending: THREE.AdditiveBlending,
+            toneMapped: false,
+          }),
+      ),
+    [beam],
+  );
+  useFrame(() => {
+    const e = ease(clock.t / 2);
+    mats.forEach((m, i) => (m.opacity = SHAFTS[i][2] * e));
+  });
+  return (
+    <>
+      {SHAFTS.map(([x, w], i) => (
+        <mesh key={i} position={[x, 2.2, -4]} scale={[w, 9, 1]} material={mats[i]}>
+          <planeGeometry />
+        </mesh>
       ))}
     </>
   );
@@ -666,77 +565,36 @@ function Blocks() {
 /* ------------------------------------------------------------------ */
 
 function World() {
-  const root = useRef<THREE.Group>(null);
-  const glow = useMemo(() => glowTexture(), []);
-  // light frosted glass for the tiles: translucent, with bright bevelled edges from the studio lights
-  const glass = useMemo(
-    () =>
-      new THREE.MeshPhysicalMaterial({
-        color: "#c9cad0",
-        emissive: new THREE.Color("#ffffff"),
-        emissiveIntensity: 0.07,
-        metalness: 0.05,
-        roughness: 0.3,
-        clearcoat: 1,
-        clearcoatRoughness: 0.04,
-        envMapIntensity: 3,
-        transparent: true,
-        opacity: 0.46,
-        depthWrite: false,
-      }),
-    [],
-  );
+  const glow = useMemo(() => radialTex(), []);
+  const beam = useMemo(() => beamTex(), []);
+  const size = useThree((s) => s.size);
+  const base = useRef({ x: 0, y: 0 });
+  // narrower screens: shrink a little so the outer cards stay in frame
+  const k = Math.min(1, size.width / size.height / 1.24);
+
   useFrame((state, dt) => {
     if (clock.running) clock.t += Math.min(dt, 1 / 30);
-    const g = root.current;
-    if (!g) return;
-    g.rotation.y = THREE.MathUtils.damp(g.rotation.y, state.pointer.x * 0.14, 2.5, dt);
-    g.rotation.x = THREE.MathUtils.damp(g.rotation.x, -state.pointer.y * 0.05, 2.5, dt);
+    // the camera drifts a touch with the pointer
+    base.current.x = THREE.MathUtils.damp(base.current.x, state.pointer.x * 0.35, 2.2, dt);
+    base.current.y = THREE.MathUtils.damp(base.current.y, state.pointer.y * 0.2, 2.2, dt);
+    state.camera.position.set(base.current.x, 6.4 + base.current.y, 13.8);
+    state.camera.lookAt(0.25, 0.1, 0);
   });
+
   return (
-    <group ref={root}>
-      <Floor glow={glow} />
+    <group scale={k}>
+      <Shafts beam={beam} />
+      <Floor glow={glow} beam={beam} />
       <Platform />
-      <Blocks />
-      <Core glow={glow} />
-      <Cables glow={glow} />
-      {TILES.map((t, i) => (
-        <TileMesh key={t.name} tile={t} index={i} glass={glass} />
+      <Cube glow={glow} />
+      {RINGS.map((r, i) => (
+        <RingMesh key={i} ring={r} glow={glow} />
+      ))}
+      {CARDS.map((c, i) => (
+        <CardMesh key={c.title} card={c} i={i} />
       ))}
     </group>
   );
-}
-
-/** Compile every shader up front (pieces start hidden, and compile skips hidden objects),
- *  so nothing stalls when the section first scrolls into view. */
-function Prepare() {
-  const gl = useThree((s) => s.gl);
-  const scene = useThree((s) => s.scene);
-  const camera = useThree((s) => s.camera);
-  const advance = useThree((s) => s.advance);
-  useEffect(() => {
-    const restore: (() => void)[] = [];
-    scene.traverse((o) => {
-      if (!o.visible) {
-        o.visible = true;
-        restore.push(() => (o.visible = false));
-      }
-    });
-    Promise.resolve(gl.compileAsync(scene, camera))
-      .catch(() => gl.compile(scene, camera))
-      .then(() => {
-        // one full render while everything is shown: uploads geometry and textures and
-        // creates the glass/reflection render targets now, not on the first scroll into view
-        requestAnimationFrame(() => {
-          gl.render(scene, camera);
-          restore.forEach((r) => r());
-          // and one frame through the whole post-processing chain, so its buffers exist too
-          requestAnimationFrame(() => advance(performance.now()));
-        });
-      })
-      .catch(() => restore.forEach((r) => r()));
-  }, [gl, scene, camera, advance]);
-  return null;
 }
 
 /** The landing plays the first time the section is well into view. */
@@ -757,32 +615,25 @@ export default function PioneeringScene() {
       <Canvas
         dpr={[1, 1.5]}
         frameloop="never"
-        camera={{ fov: 15.5, position: [19, 14.6, 19], near: 0.1, far: 90 }}
-        onCreated={({ camera, gl }) => {
-          camera.lookAt(-0.22, 1.2, 0.22);
-          // the glass refraction pass doesn't need full resolution (it is blurred anyway)
-          (gl as THREE.WebGLRenderer & { transmissionResolutionScale: number }).transmissionResolutionScale = 0.5;
-        }}
-        gl={{ antialias: false, powerPreference: "high-performance" }}
+        camera={{ fov: 30, position: [0, 6.4, 13.8], near: 0.1, far: 80 }}
+        gl={{ antialias: true, powerPreference: "high-performance" }}
       >
-        <color attach="background" args={["#030303"]} />
-        <ambientLight intensity={0.04} />
-        <directionalLight position={[-4, 9, 5]} intensity={1.1} />
-        <spotLight position={[2, 10, 3]} angle={0.5} penumbra={1} intensity={40} />
-        {/* studio softboxes: these are what the glass edges and bevels reflect */}
+        <color attach="background" args={["#08090d"]} />
+        <ambientLight intensity={0.15} />
+        <directionalLight position={[-4, 8, 6]} intensity={1.2} color="#e6ebf4" />
+        <pointLight position={[CUBE_POS.x, 0, 0]} intensity={10} distance={8} color="#c9d2e2" />
         <Environment resolution={256} frames={1}>
-          <Lightformer form="rect" intensity={3.5} position={[-5, 6, 5]} scale={[7, 3, 1]} />
-          <Lightformer form="rect" intensity={3} position={[7, 3, -2]} rotation={[0, -Math.PI / 2.4, 0]} scale={[1.4, 9, 1]} />
-          <Lightformer form="rect" intensity={1.6} position={[-7, 2, -4]} rotation={[0, Math.PI / 2.4, 0]} scale={[1, 7, 1]} />
-          <Lightformer form="rect" intensity={0.8} position={[0, -4, 3]} rotation={[Math.PI / 2, 0, 0]} scale={[8, 2, 1]} />
+          <Lightformer form="rect" intensity={3} position={[-5, 6, 5]} scale={[7, 3, 1]} color="#eef1f6" />
+          <Lightformer form="rect" intensity={2.5} position={[7, 3, -2]} rotation={[0, -Math.PI / 2.4, 0]} scale={[1.4, 9, 1]} color="#d6dce8" />
+          <Lightformer form="rect" intensity={1.2} position={[-7, 2, -4]} rotation={[0, Math.PI / 2.4, 0]} scale={[1, 7, 1]} />
           <Lightformer form="circle" intensity={2} position={[0, 9, 0]} rotation={[Math.PI / 2, 0, 0]} scale={4} />
         </Environment>
         <World />
         <Prepare />
         <VisibilityLoop target={box} rootMargin="0px 0px -10% 0px" onChange={onVisibility} />
         <EffectComposer multisampling={0}>
-          <Bloom mipmapBlur intensity={0.9} luminanceThreshold={0.85} luminanceSmoothing={0.2} />
-          <Vignette offset={0.25} darkness={0.8} />
+          <Bloom mipmapBlur intensity={0.9} luminanceThreshold={0.62} luminanceSmoothing={0.22} />
+          <Vignette offset={0.25} darkness={0.75} />
         </EffectComposer>
       </Canvas>
     </div>
