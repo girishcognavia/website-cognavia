@@ -8,7 +8,8 @@ import { useFrame, useThree } from "@react-three/fiber";
  * The hero's galaxy: a disk of stars on fine concentric tracks, seen almost edge-on and centred
  * on the globe. Being a real 3D disk, its near side passes in front of the globe and the
  * glass, and its far side behind them. It swirls in as the scene lands, then turns very slowly,
- * inner stars faster than outer ones. Monochrome, additive, subtle.
+ * inner stars faster than outer ones. Stars near the pointer (or a finger) are drawn in toward
+ * it, and spill back into their rings once it moves on.
  */
 
 /** Disk placement (centred on the globe), radius, and how it sits: seen almost edge-on, rising to the right. */
@@ -95,7 +96,8 @@ function buildGalaxy(n: number) {
 }
 
 const vertexShader = /* glsl */ `
-  uniform float uTime, uIntro, uPR, uRadius;
+  uniform float uTime, uIntro, uPR, uRadius, uAspect, uLens;
+  uniform vec2 uPointer;          // pointer in screen space (-1..1), damped
   attribute vec4 aSeed;            // x size, y brightness, z phase, w radius (0 core .. 1 rim)
   attribute vec3 aColor;
   varying float vA;
@@ -114,14 +116,28 @@ const vertexShader = /* glsl */ `
     p.xy = mat2(c, s, -s, c) * p.xy * mix(1.18, 1.0, e);
 
     vec4 mv = modelViewMatrix * vec4(p * uRadius, 1.0);
-    gl_Position = projectionMatrix * mv;
+    vec4 clip = projectionMatrix * mv;
+
+    // gravity: stars near the pointer are drawn in toward it into a small bright cluster,
+    // orbiting it a little, and spill back into their rings once it moves on
+    vec2 ndc = clip.xy / clip.w;
+    vec2 d = (ndc - uPointer) * vec2(uAspect, 1.0);
+    float dl = length(d);
+    float g = (1.0 - smoothstep(0.0, 0.26, dl)) * uLens * e;
+    g = g * g * (3.0 - 2.0 * g);
+    vec2 toward = -d * (0.55 * g * (0.7 + 0.5 * aSeed.z));
+    vec2 orbit = vec2(-d.y, d.x) * 0.35 * g * sin(uTime * 1.5 + aSeed.z * 6.28);
+    ndc += (toward + orbit) * vec2(1.0 / uAspect, 1.0);
+    float glow = g * 1.4;
+    clip.xy = ndc * clip.w;
+    gl_Position = clip;
 
     vC = aColor;
     float twinkle = 0.78 + 0.22 * sin(uTime * (0.7 + aSeed.z * 2.0) + aSeed.z * 60.0);
     float px = aSeed.x * 15.0 * uPR / max(-mv.z, 1.0);
     gl_PointSize = clamp(px, 1.0, 7.0 * uPR);
     // sub-pixel stars stay soft rather than flickering
-    vA = aSeed.y * 2.9 * twinkle * e * clamp(px / (1.6 * uPR), 0.6, 1.0);
+    vA = aSeed.y * 2.9 * twinkle * e * clamp(px / (1.6 * uPR), 0.6, 1.0) * (1.0 + glow);
   }
 `;
 
@@ -161,7 +177,15 @@ export default function HeroGalaxy({ clock }: { clock: { t: number } }) {
   const material = useMemo(
     () =>
       new THREE.ShaderMaterial({
-        uniforms: { uTime: { value: 0 }, uIntro: { value: 0 }, uPR: { value: 1 }, uRadius: { value: GALAXY.radius } },
+        uniforms: {
+          uTime: { value: 0 },
+          uIntro: { value: 0 },
+          uPR: { value: 1 },
+          uRadius: { value: GALAXY.radius },
+          uAspect: { value: 1 },
+          uLens: { value: 0 },
+          uPointer: { value: new THREE.Vector2(9, 9) },
+        },
         vertexShader,
         fragmentShader,
         transparent: true,
@@ -186,9 +210,25 @@ export default function HeroGalaxy({ clock }: { clock: { t: number } }) {
     [glow],
   );
 
-  useFrame((state) => {
+  // pointer tracking for the interaction: eased position, and a strength that rises while the
+  // pointer moves over the scene and fades away a moment after it stops or leaves
+  const pointer = useMemo(() => ({ last: new THREE.Vector2(9, 9), lens: 0, moved: 0 }), []);
+  useFrame((state, dt) => {
     const u = material.uniforms;
     u.uTime.value = state.clock.elapsedTime;
+    const p = state.pointer;
+    if (p.x !== pointer.last.x || p.y !== pointer.last.y) {
+      pointer.last.set(p.x, p.y);
+      pointer.moved = state.clock.elapsedTime;
+    }
+    const active = state.clock.elapsedTime - pointer.moved < 1.4 && Math.abs(p.x) <= 1 && Math.abs(p.y) <= 1;
+    pointer.lens = THREE.MathUtils.damp(pointer.lens, active ? 1 : 0, active ? 4 : 1.2, dt);
+    const ptr = u.uPointer.value as THREE.Vector2;
+    if (ptr.x > 5) ptr.set(p.x, p.y);
+    ptr.x = THREE.MathUtils.damp(ptr.x, p.x, 7, dt);
+    ptr.y = THREE.MathUtils.damp(ptr.y, p.y, 7, dt);
+    u.uLens.value = pointer.lens;
+    u.uAspect.value = state.size.width / state.size.height;
     // lands with the scene: starts as the panes settle, fully formed ~3s in
     u.uIntro.value = Math.min(1, Math.max(0, (clock.t - 0.7) / 2.4));
     u.uPR.value = dpr;
