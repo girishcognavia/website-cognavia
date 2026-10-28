@@ -17,7 +17,7 @@ export function generateStaticParams() {
 export async function generateMetadata({ params }: Params): Promise<Metadata> {
   const p = findProduct((await params).slug);
   if (!p) return {};
-  const title = p.detail ? `${p.name} — ${p.detail.overview.tagline} | Cognavia.ai` : `${p.name} — ${p.tag} | Cognavia.ai`;
+  const title = p.detail ? `${p.name} | ${p.detail.overview.tagline} | Cognavia.ai` : `${p.name} | ${p.tag} | Cognavia.ai`;
   const description = p.detail?.overview.body ?? p.description;
   return {
     title,

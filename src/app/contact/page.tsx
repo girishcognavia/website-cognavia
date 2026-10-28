@@ -5,7 +5,7 @@ import { FOOTER } from "@/components/footer/footerData";
 import { OG_IMAGE, SITE } from "@/lib/site";
 import "@/components/contact/contact.css";
 
-const TITLE = "Contact us — Cognavia.ai";
+const TITLE = "Contact us | Cognavia.ai";
 const DESCRIPTION =
   "Talk to Cognavia.ai about CognaAssist, CognaBrief, CognaFileSearch, MediBook AI or a custom AI project. Tell us what you need and our team will get back to you.";
 

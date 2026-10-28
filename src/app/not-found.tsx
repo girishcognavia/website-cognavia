@@ -3,7 +3,7 @@ import Link from "next/link";
 import { PageShell } from "@/components/page/PageBits";
 
 export const metadata: Metadata = {
-  title: "Page not found — Cognavia.ai",
+  title: "Page not found | Cognavia.ai",
   description: "The page you were looking for doesn't exist or has moved.",
   robots: { index: false, follow: true },
 };

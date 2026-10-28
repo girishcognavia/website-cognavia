@@ -3,7 +3,7 @@ export const SITE = {
   url: (process.env.NEXT_PUBLIC_SITE_URL || "https://cognavia.ai").replace(/\/$/, ""),
   name: "Cognavia.ai",
   legalName: "Kognavion AI Labs Private Limited",
-  title: "Cognavia.ai — Build smarter with AI",
+  title: "Cognavia.ai | Build smarter with AI",
   description:
     "Cognavia.ai, a brand of Kognavion AI Labs, builds enterprise AI products — CognaAssist, CognaBrief, CognaFileSearch and MediBook AI — bridging cutting-edge research and real-world business solutions.",
   keywords: [

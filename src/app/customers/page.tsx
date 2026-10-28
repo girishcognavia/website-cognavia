@@ -4,7 +4,7 @@ import { JsonLd } from "@/components/page/PageBits";
 import { TESTIMONIALS } from "@/components/customers/customersData";
 import { OG_IMAGE, SITE } from "@/lib/site";
 
-const TITLE = "Customers — Real Experiences with Cognavia.ai";
+const TITLE = "Customers | Real Experiences with Cognavia.ai";
 const DESCRIPTION =
   "We're building intelligent solutions that make a difference. Here's what our customers have to say about working with Cognavia.ai.";
 

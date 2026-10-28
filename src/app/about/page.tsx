@@ -11,10 +11,10 @@ import { OG_IMAGE, SITE } from "@/lib/site";
 const DESCRIPTION = ABOUT.whatWeDo.lead!;
 
 export const metadata: Metadata = {
-  title: "About us — Cognavia.ai",
+  title: "About us | Cognavia.ai",
   description: DESCRIPTION,
   alternates: { canonical: "/about" },
-  openGraph: { title: "About us — Cognavia.ai", description: DESCRIPTION, url: "/about", images: [OG_IMAGE] },
+  openGraph: { title: "About us | Cognavia.ai", description: DESCRIPTION, url: "/about", images: [OG_IMAGE] },
 };
 
 export default function AboutPage() {

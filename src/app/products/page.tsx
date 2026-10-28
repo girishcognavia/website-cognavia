@@ -7,10 +7,10 @@ import { OG_IMAGE, SITE } from "@/lib/site";
 const DESCRIPTION = "Powerful AI products designed for specific enterprise needs.";
 
 export const metadata: Metadata = {
-  title: "Products — Our Intelligent Suite | Cognavia.ai",
+  title: "Products | Our Intelligent Suite | Cognavia.ai",
   description: `${DESCRIPTION} ${PRODUCTS.map((p) => p.name).join(", ")}.`,
   alternates: { canonical: "/products" },
-  openGraph: { title: "Our Intelligent Suite — Cognavia.ai", description: DESCRIPTION, url: "/products", images: [OG_IMAGE] },
+  openGraph: { title: "Our Intelligent Suite | Cognavia.ai", description: DESCRIPTION, url: "/products", images: [OG_IMAGE] },
 };
 
 export default function ProductsPage() {
