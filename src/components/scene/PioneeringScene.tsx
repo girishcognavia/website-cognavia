@@ -7,6 +7,7 @@ import { Environment, Lightformer } from "@react-three/drei";
 import { Bloom, EffectComposer, Vignette } from "@react-three/postprocessing";
 import Prepare from "./Prepare";
 import VisibilityLoop from "./VisibilityLoop";
+import { gpuTier } from "./gpu";
 
 /**
  * Section 2 ("Pioneering the Future of AI"): a glass cube with a glowing AI chip inside,
@@ -602,8 +603,19 @@ const onVisibility = (visible: boolean, e: IntersectionObserverEntry) => {
   if (visible && e.intersectionRatio > 0.3) clock.running = true;
 };
 
+/** Software-only graphics: the finished scene as a still. */
+function StillFrames() {
+  const invalidate = useThree((s) => s.invalidate);
+  useEffect(() => {
+    clock.t = 30;
+    invalidate();
+  }, [invalidate]);
+  return null;
+}
+
 export default function PioneeringScene() {
   const box = useRef<HTMLDivElement>(null);
+  const { lite, mobile } = gpuTier();
 
   useEffect(() => {
     clock.t = 0;
@@ -613,8 +625,8 @@ export default function PioneeringScene() {
   return (
     <div className="pioneering__canvas" ref={box} aria-hidden>
       <Canvas
-        dpr={[1, 1.5]}
-        frameloop="never"
+        dpr={lite ? 1 : mobile ? [1, 1.25] : [1, 1.5]}
+        frameloop={lite ? "demand" : "never"}
         camera={{ fov: 30, position: [0, 6.4, 13.8], near: 0.1, far: 80 }}
         gl={{ antialias: true, powerPreference: "high-performance" }}
       >
@@ -622,19 +634,27 @@ export default function PioneeringScene() {
         <ambientLight intensity={0.15} />
         <directionalLight position={[-4, 8, 6]} intensity={1.2} color="#e6ebf4" />
         <pointLight position={[CUBE_POS.x, 0, 0]} intensity={10} distance={8} color="#c9d2e2" />
-        <Environment resolution={256} frames={1}>
+        <Environment resolution={lite ? 64 : 256} frames={1}>
           <Lightformer form="rect" intensity={3} position={[-5, 6, 5]} scale={[7, 3, 1]} color="#eef1f6" />
           <Lightformer form="rect" intensity={2.5} position={[7, 3, -2]} rotation={[0, -Math.PI / 2.4, 0]} scale={[1.4, 9, 1]} color="#d6dce8" />
           <Lightformer form="rect" intensity={1.2} position={[-7, 2, -4]} rotation={[0, Math.PI / 2.4, 0]} scale={[1, 7, 1]} />
           <Lightformer form="circle" intensity={2} position={[0, 9, 0]} rotation={[Math.PI / 2, 0, 0]} scale={4} />
         </Environment>
         <World />
-        <Prepare />
-        <VisibilityLoop target={box} rootMargin="0px 0px -10% 0px" onChange={onVisibility} />
+        {lite ? (
+          <StillFrames />
+        ) : (
+          <>
+            <Prepare />
+            <VisibilityLoop target={box} rootMargin="0px 0px -10% 0px" onChange={onVisibility} />
+          </>
+        )}
+{!lite && (
         <EffectComposer multisampling={0}>
           <Bloom mipmapBlur intensity={0.9} luminanceThreshold={0.62} luminanceSmoothing={0.22} />
           <Vignette offset={0.25} darkness={0.75} />
         </EffectComposer>
+        )}
       </Canvas>
     </div>
   );

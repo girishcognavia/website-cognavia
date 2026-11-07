@@ -1,10 +1,12 @@
 "use client";
 
-import { useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { useGSAP } from "@gsap/react";
 import dynamic from "next/dynamic";
+import { gpuTier } from "@/components/scene/gpu";
+import { ScenePoster } from "@/components/hero/Hero";
 
 const PioneeringScene = dynamic(() => import("@/components/scene/PioneeringScene"), { ssr: false });
 
@@ -12,6 +14,14 @@ gsap.registerPlugin(ScrollTrigger, useGSAP);
 
 export default function About() {
   const sectionRef = useRef<HTMLElement>(null);
+  // the 3D scene loads only once the section is within a quarter of a screen of view, so it adds
+  // nothing to the first load of the page
+  const [near, setNear] = useState(false);
+  useEffect(() => {
+    const io = new IntersectionObserver(([e]) => e.isIntersecting && (setNear(true), io.disconnect()), { rootMargin: "25% 0px" });
+    io.observe(sectionRef.current!);
+    return () => io.disconnect();
+  }, []);
 
   useGSAP(
     () => {
@@ -27,7 +37,13 @@ export default function About() {
   return (
     <section className="about" id="about" ref={sectionRef} aria-labelledby="about-title">
       <div className="about__inner">
-        <PioneeringScene />
+        {!near ? (
+          <div className="pioneering__canvas" aria-hidden />
+        ) : gpuTier().lite ? (
+          <ScenePoster name="pio" className="pioneering__canvas pioneering__poster" />
+        ) : (
+          <PioneeringScene />
+        )}
         <div className="about__content">
           <p className="about__eyebrow" data-reveal>
             Innovation <span aria-hidden>×</span> Research <span aria-hidden>×</span> Real-world impact

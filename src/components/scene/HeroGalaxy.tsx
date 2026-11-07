@@ -3,6 +3,7 @@
 import { useMemo } from "react";
 import * as THREE from "three";
 import { useFrame, useThree } from "@react-three/fiber";
+import { gpuTier } from "./gpu";
 
 /**
  * The hero's galaxy: a disk of stars on fine concentric tracks, seen almost edge-on and centred
@@ -96,7 +97,7 @@ function buildGalaxy(n: number) {
 }
 
 const vertexShader = /* glsl */ `
-  uniform float uTime, uIntro, uPR, uRadius, uAspect, uLens;
+  uniform float uTime, uIntro, uPR, uRadius, uAspect, uLens, uBoost;
   uniform vec2 uPointer;          // pointer in screen space (-1..1), damped
   attribute vec4 aSeed;            // x size, y brightness, z phase, w radius (0 core .. 1 rim)
   attribute vec3 aColor;
@@ -137,7 +138,7 @@ const vertexShader = /* glsl */ `
     float px = aSeed.x * 15.0 * uPR / max(-mv.z, 1.0);
     gl_PointSize = clamp(px, 1.0, 7.0 * uPR);
     // sub-pixel stars stay soft rather than flickering
-    vA = aSeed.y * 2.9 * twinkle * e * clamp(px / (1.6 * uPR), 0.6, 1.0) * (1.0 + glow);
+    vA = aSeed.y * 2.9 * uBoost * twinkle * e * clamp(px / (1.6 * uPR), 0.6, 1.0) * (1.0 + glow);
   }
 `;
 
@@ -173,7 +174,9 @@ function glowTexture() {
 
 export default function HeroGalaxy({ clock }: { clock: { t: number } }) {
   const dpr = useThree((s) => s.viewport.dpr);
-  const geometry = useMemo(() => buildGalaxy(COUNT), []);
+  // phones and software-only graphics draw a lighter galaxy (same look, fewer, slightly larger stars)
+  const tier = gpuTier();
+  const geometry = useMemo(() => buildGalaxy(tier.lite || tier.mobile ? Math.round(COUNT * 0.42) : COUNT), [tier]);
   const material = useMemo(
     () =>
       new THREE.ShaderMaterial({
@@ -184,6 +187,7 @@ export default function HeroGalaxy({ clock }: { clock: { t: number } }) {
           uRadius: { value: GALAXY.radius },
           uAspect: { value: 1 },
           uLens: { value: 0 },
+          uBoost: { value: 1 },
           uPointer: { value: new THREE.Vector2(9, 9) },
         },
         vertexShader,
@@ -216,6 +220,7 @@ export default function HeroGalaxy({ clock }: { clock: { t: number } }) {
   useFrame((state, dt) => {
     const u = material.uniforms;
     u.uTime.value = state.clock.elapsedTime;
+    u.uBoost.value = tier.lite || tier.mobile ? 1.45 : 1; // fewer stars: each a little brighter
     const p = state.pointer;
     if (p.x !== pointer.last.x || p.y !== pointer.last.y) {
       pointer.last.set(p.x, p.y);
