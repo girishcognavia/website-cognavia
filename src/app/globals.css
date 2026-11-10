@@ -174,7 +174,10 @@ html[data-hero-go] .hero [data-intro] {
   transition: transform 0.7s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.5s ease;
 }
 
-.site-header__logo { font-size: 15px; font-weight: 500; letter-spacing: 0.32em; }
+.site-header__logo { display: inline-flex; align-items: center; gap: 10px; }
+.site-header__mark { width: 30px; height: 30px; flex: none; }
+.site-header__word { font-size: 23px; font-weight: 700; line-height: 1; letter-spacing: -0.03em; color: #F4F2EC; }
+.site-header__word span { color: #0B7F73; }
 .site-header__nav { display: flex; align-items: center; font-size: 13px; }
 
 /* in-page jump targets (placed where each section's 3D scene has settled) */
@@ -1741,7 +1744,9 @@ a.products__item { width: fit-content; text-decoration: none; }
 
 @media (max-width: 760px) {
   .site-header { height: 64px; }
-  .site-header__logo { font-size: 13px; letter-spacing: 0.24em; }
+  .site-header__logo { gap: 8px; }
+  .site-header__mark { width: 24px; height: 24px; }
+  .site-header__word { font-size: 19px; }
 
   /* phone menu: full-width panel under the header */
   .site-header__burger { display: block; }

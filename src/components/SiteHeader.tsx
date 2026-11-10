@@ -130,9 +130,16 @@ export default function SiteHeader() {
   return (
     <div className={`site-chrome${visible ? " is-visible" : ""}`}>
       <header className={`site-header${menuOpen ? " is-menu-open" : ""}`}>
-        <Link href="/" className="site-header__logo" aria-label="Cognavia.ai — home" onClick={goHome}>
-          {/* Logo image goes here later */}
-          Cognavia.ai
+        <Link href="/" className="site-header__logo" aria-label="Cognavia.ai, home" onClick={goHome}>
+          {/* the Cognavia symbol: a teal open ring with a dot at its mouth (from the brand logo;
+              the word and dot are off-white instead of black, for the dark header) */}
+          <svg className="site-header__mark" viewBox="0 0 120 120" fill="none" aria-hidden>
+            <path d="M93.7 31.7 A44 44 0 1 0 93.7 88.3" stroke="#0B7F73" strokeWidth="15" strokeLinecap="round" />
+            <circle cx="97" cy="60" r="10" fill="#F4F2EC" />
+          </svg>
+          <span className="site-header__word">
+            cognavia<span>.ai</span>
+          </span>
         </Link>
 
         <button
