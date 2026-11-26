@@ -17,8 +17,10 @@ export default function SmoothScroll({ children }: { children: React.ReactNode }
 
   useEffect(() => {
     lenis = new Lenis({
-      lerp: 0.09,
-      wheelMultiplier: 0.9,
+      // a touch more direct than before: still smooth, but follows the wheel closely instead
+      // of gliding on (which read as lag)
+      lerp: 0.14,
+      wheelMultiplier: 1,
       anchors: true,
       // the CognaAssist chat widget (elements with cog- ids) scrolls natively
       prevent: (node) => !!node.closest?.('[id^="cog-"]'),

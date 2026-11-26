@@ -219,10 +219,36 @@ export default function Products() {
     productStore.set(i);
   };
   const leave = () => {
+    if (lastTap.current.type !== "mouse") return; // touch: a card stays in front until the next tap
     clearTimeout(leaveTimer.current);
     leaveTimer.current = window.setTimeout(() => productStore.set(-1), 140);
   };
   useEffect(() => () => clearTimeout(leaveTimer.current), []);
+
+  // touch has no hover: the first tap on a product brings it to the front, a second tap on the
+  // same product opens it, and a tap anywhere else lets it drop back. (The product that was in
+  // front is read at pointer-down, before the browser's emulated hover can change it.)
+  const lastTap = useRef<{ type: string; frontAtDown: number }>({ type: "mouse", frontAtDown: -1 });
+  const tap = (i: number) => ({
+    onPointerDown: (e: React.PointerEvent) => {
+      lastTap.current = { type: e.pointerType, frontAtDown: productStore.get() };
+    },
+    onClick: (e: React.MouseEvent) => {
+      if (lastTap.current.type === "mouse" || lastTap.current.frontAtDown === i) return; // open it
+      e.preventDefault();
+      clearTimeout(leaveTimer.current);
+      productStore.set(i);
+    },
+  });
+  useEffect(() => {
+    const away = (e: PointerEvent) => {
+      if (e.pointerType === "mouse") return;
+      const el = e.target as Element;
+      if (!el.closest(".products__stage, .products__list")) productStore.set(-1);
+    };
+    document.addEventListener("pointerdown", away);
+    return () => document.removeEventListener("pointerdown", away);
+  }, []);
 
   // scale the fixed-size card art to its box (the whole frame on desktop, a crop on phones)
   useLayoutEffect(() => {
@@ -322,6 +348,7 @@ export default function Products() {
                 },
                 onMouseEnter: () => enter(i),
                 onMouseLeave: leave,
+                ...tap(i),
               };
               const inner = (
                 <>
@@ -363,6 +390,7 @@ export default function Products() {
                 style: { width: c.w, height: c.h, transform: c.transform },
                 onMouseEnter: () => enter(i),
                 onMouseLeave: leave,
+                ...tap(i),
               };
               return LINKED.has(c.slug) ? (
                 <Link key={c.slug} href={productHref(p)} tabIndex={-1} {...props} />
@@ -388,7 +416,7 @@ export default function Products() {
             Powerful AI products designed for specific enterprise needs.
           </p>
 
-          <ul className="products__list" onMouseLeave={() => productStore.set(-1)}>
+          <ul className="products__list" onMouseLeave={() => lastTap.current.type === "mouse" && productStore.set(-1)}>
             {PRODUCTS.map((p, i) => (
               <li key={p.slug} data-reveal>
                 {LINKED.has(p.slug) ? (
@@ -398,6 +426,7 @@ export default function Products() {
                     aria-label={`${p.name}: ${p.description}`}
                     onMouseEnter={() => productStore.set(i)}
                     onFocus={() => productStore.set(i)}
+                    {...tap(i)}
                   >
                     <span className="products__dot" aria-hidden />
                     <span className="products__name">{p.name}</span>
