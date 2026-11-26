@@ -574,7 +574,7 @@ function World() {
   const k = Math.min(1, size.width / size.height / 1.24);
 
   useFrame((state, dt) => {
-    if (clock.running) clock.t += Math.min(dt, 1 / 30);
+    if (clock.running) clock.t += Math.min(dt, 1 / 30) * 1.8; // 1.8× pace: in place within about a second
     // the camera drifts a touch with the pointer
     base.current.x = THREE.MathUtils.damp(base.current.x, state.pointer.x * 0.35, 2.2, dt);
     base.current.y = THREE.MathUtils.damp(base.current.y, state.pointer.y * 0.2, 2.2, dt);
@@ -600,7 +600,7 @@ function World() {
 
 /** The landing plays the first time the section is well into view. */
 const onVisibility = (visible: boolean, e: IntersectionObserverEntry) => {
-  if (visible && e.intersectionRatio > 0.3) clock.running = true;
+  if (visible && e.intersectionRatio > 0.12) clock.running = true;
 };
 
 /** Software-only graphics: the finished scene as a still. */
@@ -625,7 +625,7 @@ export default function PioneeringScene() {
   return (
     <div className="pioneering__canvas" ref={box} aria-hidden>
       <Canvas
-        dpr={lite ? 1 : mobile ? [1, 1.25] : [1, 1.5]}
+        dpr={lite ? 1 : mobile ? [1, 1.25] : [1, 2]}
         frameloop={lite ? "demand" : "never"}
         camera={{ fov: 30, position: [0, 6.4, 13.8], near: 0.1, far: 80 }}
         gl={{ antialias: true, powerPreference: "high-performance" }}

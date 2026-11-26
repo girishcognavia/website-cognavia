@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useThree } from "@react-three/fiber";
 import { PerformanceMonitor } from "@react-three/drei";
 
@@ -72,9 +72,17 @@ export default function VisibilityLoop({
     };
   }, [target, rootMargin, setFrameloop, onChange]);
   // frame rate dropping (a lighter graphics chip): draw at standard resolution instead,
-  // and if it still can't keep up, hold the scenes while scrolling too
+  // and if it still can't keep up, hold the scenes while scrolling too. It only starts watching
+  // once loading has settled: the busy first seconds would otherwise read as a slow device.
+  const [watch, setWatch] = useState(false);
+  useEffect(() => {
+    const t = window.setTimeout(() => setWatch(true), 5000);
+    return () => clearTimeout(t);
+  }, []);
+  if (!watch) return null;
   return (
     <PerformanceMonitor
+      bounds={() => [40, 60]}
       flipflops={2}
       onDecline={() => {
         setDpr(1);

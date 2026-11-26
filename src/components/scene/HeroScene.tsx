@@ -61,7 +61,8 @@ function Driver() {
   }, [gl, scene, camera, invalidate]);
 
   useFrame((state, dt) => {
-    if (stageStatus.ready && !gpuTier().lite) heroClock.t += Math.min(dt, 1 / 30);
+    // the landing plays at 1.8× pace: the full picture is in place about 1.5s after the scene is ready
+    if (stageStatus.ready && !gpuTier().lite) heroClock.t += Math.min(dt, 1 / 30) * 1.8;
     // the camera eases in gently as the scene lands, and follows the pointer a little
     const landing = 1 - Math.pow(1 - Math.min(1, heroClock.t / 2.6), 3);
     const cam = state.camera;
@@ -80,7 +81,7 @@ export default function HeroScene() {
   return (
     <div className="hero__canvas" ref={box} aria-hidden>
       <Canvas
-        dpr={lite ? 1 : mobile ? [1, 1.25] : [1, 1.5]}
+        dpr={lite ? 1 : mobile ? [1, 1.25] : [1, 2]}
         frameloop={lite ? "demand" : "always"}
         camera={{ fov: 35, position: [0, 0, CAM_Z + 1.6], near: 0.1, far: 100 }}
         gl={{ antialias: false, powerPreference: "high-performance" }}

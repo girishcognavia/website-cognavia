@@ -14,13 +14,22 @@ gsap.registerPlugin(ScrollTrigger, useGSAP);
 
 export default function About() {
   const sectionRef = useRef<HTMLElement>(null);
-  // the 3D scene loads only once the section is within a quarter of a screen of view, so it adds
-  // nothing to the first load of the page
   const [near, setNear] = useState(false);
   useEffect(() => {
-    const io = new IntersectionObserver(([e]) => e.isIntersecting && (setNear(true), io.disconnect()), { rootMargin: "25% 0px" });
+    if (gpuTier().lite) {
+      const io = new IntersectionObserver(([e]) => e.isIntersecting && (setNear(true), io.disconnect()), { rootMargin: "25% 0px" });
+      io.observe(sectionRef.current!);
+      return () => io.disconnect();
+    }
+    // prepare the scene in the background once the page has settled (or as soon as the
+    // section comes near), so it is ready the moment the visitor scrolls to it
+    const io = new IntersectionObserver(([e]) => e.isIntersecting && (setNear(true), io.disconnect()), { rootMargin: "60% 0px" });
     io.observe(sectionRef.current!);
-    return () => io.disconnect();
+    const t = window.setTimeout(() => setNear(true), 2500);
+    return () => {
+      io.disconnect();
+      clearTimeout(t);
+    };
   }, []);
 
   useGSAP(
